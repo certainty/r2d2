@@ -1,0 +1,23 @@
+[package]
+name = "r2d2"
+version = "0.1.0"
+authors = ["certainty <david.krentzlin@gmail.com>"]
+edition = "2018"
+
+[lib]
+name="r2d2_lib"
+path="src/lib.rs"
+
+# [[bin]]
+# name="r2d2_server"
+# path="src/bin/server.rs"
+
+[dependencies]
+nom = "4.2.3"
+rustyline = "3.0.0"
+termion = "1.5.1"
+log = "0.4.6"
+env_logger = "0.6.1"
+
+[dev-dependencies]
+simulacrum = "0.3.1"
