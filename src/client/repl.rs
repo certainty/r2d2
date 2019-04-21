@@ -6,7 +6,7 @@
 
 mod command;
 extern crate rustyline;
-use crate::engine::Engine;
+use crate::engine::{Engine, Key, Value};
 use command::Command;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -67,25 +67,27 @@ fn eval(cmd: Command, engine: &mut Engine) -> Output {
 
     Command::Stats => Output::Message(String::from("Printing statistics")),
 
-    Command::Insert(key, value) => match engine.insert(key, value) {
-      Ok(_) => Output::Message(String::from("OK <>")),
-      Err(msg) => Output::Error(msg),
-    },
+    Command::Insert(key, value) => {
+      match engine.insert(Key::from_string(key), Value::from_string(value)) {
+        Ok(_) => Output::Message(String::from("OK <>")),
+        Err(msg) => Output::Error(msg),
+      }
+    }
 
-    Command::Delete(key) => match engine.delete(key) {
-      Ok(Some(value)) => Output::Message(format!("OK <{}>", value)),
+    Command::Delete(key) => match engine.delete(Key::from_string(key)) {
+      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value)),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
-    Command::Lookup(key) => match engine.lookup(key) {
-      Ok(Some(value)) => Output::Message(format!("OK <{}>", value)),
+    Command::Lookup(key) => match engine.lookup(Key::from_string(key)) {
+      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value)),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
     Command::ListKeys => match engine.list_keys() {
-      Ok(keys) => Output::Message(format!("OK <{}>", keys.join(", "))),
+      Ok(keys) => Output::Message(format!("OK <{:?}>", keys)),
       Err(msg) => Output::Error(msg),
     },
 
