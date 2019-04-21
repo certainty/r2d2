@@ -7,6 +7,10 @@
 //! It presents itself with a dictionary-like interfacer where each operation
 //! might fail. This is deliberate since every operation has to potentially interact
 //! with the OS or the network which are unreliable components.
+//!
+
+pub mod default;
+
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 pub struct Key(Vec<u8>);
 
@@ -61,14 +65,19 @@ pub trait Engine {
   //
   // If the function returns successfully, the following guarantees hold:
   // * the change is durable on the local node.
+  // * the key/value can not be found anymore (unless it has been re-inserted)
   fn delete(&mut self, key: Key) -> Result<Option<Value>, String>;
 
+  //Lookup a value for the given key
+  //
+  // Find a value for the given key if it exists.
+  // This operation might fail, e.g. when implementatons need to access the
+  // filesystem or the network.
   fn lookup(&self, key: Key) -> Result<Option<&Value>, String>;
 
-  // List all the currently stored keys.
+  // List all the currently stored keys
+  //
   // This is purely for debug reasons as in any real system the amount of keys
   // might grow way too large to return them all in a vector.
   fn list_keys(&self) -> Result<Vec<Key>, String>;
 }
-
-pub mod default;
