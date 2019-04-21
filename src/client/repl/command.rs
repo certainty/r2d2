@@ -59,7 +59,7 @@ mod parser {
 
   pub fn parse(input: &str) -> Result<Command, String> {
     match parser::parse_command(CompleteStr(input.trim())) {
-      Ok((_, cmd)) => Result::Ok(cmd),
+      Ok((CompleteStr(""), cmd)) => Result::Ok(cmd),
       _ => Result::Err(String::from("Unknown command"))
     }
   }
@@ -78,28 +78,32 @@ mod tests {
   fn parse_insert_succeeds() {
     assert_eq!(
       parse(&String::from(":insert foo bar")), 
-      Ok(Command::Insert(String::from("foo"), String::from("bar"))))
+      Ok(Command::Insert(String::from("foo"), String::from("bar")))
+    )
   }
 
 #[test]
   fn parse_insert_fails_when_key_is_missing() {
     assert_eq!(
       parse(&String::from(":insert")), 
-      Err(String::from("Unknown command")))
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
   fn parse_insert_fails_when_value_is_missing() {
     assert_eq!(
       parse(&String::from(":insert bar")), 
-      Err(String::from("Unknown command")))
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
-  fn parse_insert_ignores_garbage() {
+  fn parse_fails_with_appended_garbage() {
     assert_eq!(
       parse(&String::from(":insert foo bar garbage")),
-      Ok(Command::Insert(String::from("foo"), String::from("bar"))));
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
@@ -113,55 +117,63 @@ mod tests {
   fn parse_delete_fails_when_key_is_missing(){
     assert_eq!(
       parse(&String::from(":delete  ")),
-      Err(String::from("Unknown command")))
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
-  fn parse_delete_ignored_garbage(){
+  fn parse_delete_fails_with_appended_garbage(){
     assert_eq!(
       parse(&String::from(":delete foo garbagelfdsjlkf")),
-      Ok(Command::Delete(String::from("foo"))));
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
   fn parse_lookup_succeeds(){
     assert_eq!(
       parse(&String::from(":lookup foo")),
-      Ok(Command::Lookup(String::from("foo"))));
+      Ok(Command::Lookup(String::from("foo")))
+    )
   }
 
 #[test]
   fn parse_lookup_fails_when_key_is_missing(){
     assert_eq!(
       parse(&String::from(":lookup  ")),
-      Err(String::from("Unknown command")))
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
-  fn parse_lookup_ignores_garbage(){
+  fn parse_lookup_fails_with_appended_garbage(){
     assert_eq!(
       parse(&String::from(":lookup foo garbagelfdsjlkf")),
-      Ok(Command::Lookup(String::from("foo"))));
+      Err(String::from("Unknown command"))
+    )
   }
 
   #[test]
   fn parse_list_keys_succeeds() {
-   assert_eq!(
+    assert_eq!(
       parse(&String::from(":list_keys")), 
-      Ok(Command::ListKeys))
+      Ok(Command::ListKeys)
+    )
   }
 
 #[test]
   fn parse_help_succeeds() {
-   assert_eq!(
+    assert_eq!(
       parse(&String::from(":help")), 
-      Ok(Command::Help))
+      Ok(Command::Help)
+    )
   }
 
   #[test]
   fn parse_quit_succeeds() {
     assert_eq!(
       parse(&String::from(":quit")),
-      Ok(Command::Quit))
+      Ok(Command::Quit)
+    )
   }
 }
