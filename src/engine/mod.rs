@@ -11,6 +11,10 @@
 pub struct Key(Vec<u8>);
 
 impl Key {
+  pub fn as_bytes(&self) -> &Vec<u8> {
+    &self.0
+  }
+
   pub fn from_string(str: String) -> Key {
     Key(str.into_bytes())
   }
@@ -26,6 +30,10 @@ impl Key {
 pub struct Value(Vec<u8>);
 
 impl Value {
+  pub fn as_bytes(&self) -> &Vec<u8> {
+    &self.0
+  }
+
   pub fn from_string(str: String) -> Value {
     Value(str.into_bytes())
   }

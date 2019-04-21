@@ -75,19 +75,22 @@ fn eval(cmd: Command, engine: &mut Engine) -> Output {
     }
 
     Command::Delete(key) => match engine.delete(Key::from_string(key)) {
-      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value)),
+      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value_to_str(&value))),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
     Command::Lookup(key) => match engine.lookup(Key::from_string(key)) {
-      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value)),
+      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value_to_str(value))),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
     Command::ListKeys => match engine.list_keys() {
-      Ok(keys) => Output::Message(format!("OK <{:?}>", keys)),
+      Ok(keys) => Output::Message(format!(
+        "OK <{:?}>",
+        keys.into_iter().map(|k| key_to_str(&k))
+      )),
       Err(msg) => Output::Error(msg),
     },
 
@@ -105,6 +108,14 @@ fn eval(cmd: Command, engine: &mut Engine) -> Output {
     ",
     )),
   }
+}
+
+fn value_to_str(value: &Value) -> String {
+  String::from_utf8(value.as_bytes().clone()).unwrap()
+}
+
+fn key_to_str(key: &Key) -> String {
+  String::from_utf8(key.as_bytes().clone()).unwrap()
 }
 
 fn print(output: Output) {
