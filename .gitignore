@@ -10,3 +10,4 @@ Cargo.lock
 **/*.rs.bk
 
 .r2d2_history
+.vscode
