@@ -4,9 +4,12 @@
 //! them with the currently active engine. This is intdended to be used for debug
 //! purposes only.
 
-mod command;
 extern crate rustyline;
 use crate::engine::{Engine, Key, Value};
+
+mod command;
+mod command_parser;
+
 use command::Command;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
@@ -50,7 +53,7 @@ fn read(editor: &mut Editor<()>) -> Result<Input, String> {
   match readline {
     Ok(line) => {
       editor.add_history_entry(line.as_ref());
-      match command::parse(&line) {
+      match command_parser::parse(&line) {
         Ok(cmd) => Result::Ok(Input::Cmd(cmd)),
         Err(_) => Result::Err(String::from("Invalid command")),
       }
