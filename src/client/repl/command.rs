@@ -13,6 +13,12 @@ pub enum Command {
 }
 
 mod parser {
+    #[derive(Debug, PartialEq)]
+    pub enum Error {
+      ParsingIncomplete,
+      ParseError
+    }
+
     use super::*;
     named!(cmd_quit<CompleteStr, Command>, map!(tag_s!("quit"), |_| Command::Quit));
 
@@ -55,14 +61,17 @@ mod parser {
         cmd: alt_complete!(cmd_quit | cmd_lookup | cmd_delete | cmd_insert | cmd_list_keys | cmd_stats | cmd_help) >> 
         (cmd))
     );
-  }
+}
 
-  pub fn parse(input: &str) -> Result<Command, String> {
-    match parser::parse_command(CompleteStr(input.trim())) {
-      Ok((CompleteStr(""), cmd)) => Result::Ok(cmd),
-      _ => Result::Err(String::from("Unknown command"))
-    }
+use parser::Error;
+
+pub fn parse(input: &str) -> Result<Command, Error> {
+  match parser::parse_command(CompleteStr(input.trim())) {
+    Ok((CompleteStr(""), cmd)) => Result::Ok(cmd),
+    Ok(_) => Result::Err(Error::ParsingIncomplete),
+    Err(_) => Result::Err(Error::ParseError)
   }
+}
 
 
 #[cfg(test)]
@@ -86,7 +95,7 @@ mod tests {
   fn parse_insert_fails_when_key_is_missing() {
     assert_eq!(
       parse(&String::from(":insert")), 
-      Err(String::from("Unknown command"))
+      Err(Error::ParseError)
     )
   }
 
@@ -94,7 +103,7 @@ mod tests {
   fn parse_insert_fails_when_value_is_missing() {
     assert_eq!(
       parse(&String::from(":insert bar")), 
-      Err(String::from("Unknown command"))
+      Err(Error::ParseError)
     )
   }
 
@@ -102,7 +111,7 @@ mod tests {
   fn parse_fails_with_appended_garbage() {
     assert_eq!(
       parse(&String::from(":insert foo bar garbage")),
-      Err(String::from("Unknown command"))
+      Err(Error::ParsingIncomplete)
     )
   }
 
@@ -117,7 +126,7 @@ mod tests {
   fn parse_delete_fails_when_key_is_missing(){
     assert_eq!(
       parse(&String::from(":delete  ")),
-      Err(String::from("Unknown command"))
+      Err(Error::ParseError)
     )
   }
 
@@ -125,7 +134,7 @@ mod tests {
   fn parse_delete_fails_with_appended_garbage(){
     assert_eq!(
       parse(&String::from(":delete foo garbagelfdsjlkf")),
-      Err(String::from("Unknown command"))
+      Err(Error::ParsingIncomplete)
     )
   }
 
@@ -141,7 +150,7 @@ mod tests {
   fn parse_lookup_fails_when_key_is_missing(){
     assert_eq!(
       parse(&String::from(":lookup  ")),
-      Err(String::from("Unknown command"))
+      Err(Error::ParseError)
     )
   }
 
@@ -149,7 +158,7 @@ mod tests {
   fn parse_lookup_fails_with_appended_garbage(){
     assert_eq!(
       parse(&String::from(":lookup foo garbagelfdsjlkf")),
-      Err(String::from("Unknown command"))
+      Err(Error::ParsingIncomplete)
     )
   }
 

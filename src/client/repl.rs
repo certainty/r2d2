@@ -52,7 +52,7 @@ fn read(editor: &mut Editor<()>) -> Result<Input, String> {
       editor.add_history_entry(line.as_ref());
       match command::parse(&line) {
         Ok(cmd) => Result::Ok(Input::Cmd(cmd)),
-        Err(msg) => Result::Err(msg),
+        Err(_) => Result::Err(String::from("Invalid command")),
       }
     }
     Err(ReadlineError::Interrupted) => Result::Ok(Input::Break),
