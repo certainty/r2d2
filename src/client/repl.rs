@@ -5,6 +5,7 @@
 //! purposes only.
 
 extern crate rustyline;
+extern crate itertools;
 use crate::engine::Engine;
 
 mod command;
@@ -15,6 +16,7 @@ use rustyline::error::ReadlineError;
 use rustyline::Editor;
 use std::result::Result;
 use termion::color;
+use itertools::Itertools;
 
 const HISTORY_FILE: &str = ".r2d2_history";
 
@@ -74,7 +76,7 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
 
     Command::Insert(key, value) => {
       match engine.insert(key.as_ref(), value.as_ref()) {
-        Ok(_) => Output::Message(String::from("OK <>")),
+        Ok(_)    => Output::Message(String::from("OK <>")),
         Err(msg) => Output::Error(msg),
       }
     },
@@ -93,11 +95,9 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
 
     Command::ListKeys => match engine.list_keys() {
       Ok(keys) =>  {
-        let keys_str: Vec<String> = keys.iter().map(|k| String::from(k)).collect();
-
         Output::Message(format!(
          "OK <{}>",
-         keys_str.join(", ")
+          keys.iter().map(|k| String::from(k)).join(", ")
        ))
      },
 

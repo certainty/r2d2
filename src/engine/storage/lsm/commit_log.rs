@@ -74,9 +74,8 @@ impl CommitLog {
     }
 
     fn write_operation(&mut self, operation: &Operation) -> Result<(), Error> {
-      let data       = bincode::serialize(operation)?;
-      let mut writer = self.writer.lock()?;
-      let written    = writer.write(&data)?;
+      let data = bincode::serialize(operation)?;
+      self.writer.lock()?.write(&data)?;
       Ok(())
     }
 }

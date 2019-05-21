@@ -24,7 +24,7 @@ fn main() {
                     .get_matches();
 
     if let Some(_subcommand_matches) = matches.subcommand_matches("repl") {
-        start_repl();
+      start_repl();
     } else {
       println!("No such command");
     }

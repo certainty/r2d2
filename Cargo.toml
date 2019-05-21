@@ -17,6 +17,7 @@ env_logger = "0.6.1"
 serde = { version = "1.0.91", features = ["derive"]}
 bincode = "1.1.4"
 clap = "2.33.0"
+itertools = "0.8"
 
 [dev-dependencies]
 simulacrum = "0.3.1"
