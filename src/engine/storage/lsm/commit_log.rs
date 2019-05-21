@@ -16,6 +16,7 @@ use std::result::Result;
 use std::path;
 use std::fs::*;
 use log::trace;
+use std::convert::From;
 
 pub enum Error {
     SerializationError,
@@ -23,54 +24,60 @@ pub enum Error {
     LockError
 }
 
-impl std::convert::From<io::Error> for Error {
+impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
         Error::IoError(e)
     }
 }
 
-impl<T> std::convert::From<std::sync::PoisonError<T>> for Error {
+impl<T> From<std::sync::PoisonError<T>> for Error {
     fn from(_: std::sync::PoisonError<T>) -> Self {
         Error::LockError
     }
 }
 
+impl From<std::boxed::Box<bincode::ErrorKind>> for Error {
+  fn from(e: std::boxed::Box<bincode::ErrorKind>) -> Self {
+    Error::SerializationError
+  }
+}
+
 #[derive(Serialize, Deserialize, Debug)]
-enum Operation {
-    Set(Vec<u8>, Vec<u8>),
-    Delete(Vec<u8>),
+enum Operation<'a> {
+    Set(& 'a [u8], & 'a [u8]),
+    Delete(& 'a [u8]),
 }
 
 pub struct CommitLog {
-    path: path::PathBuf,
     writer: Arc<Mutex<File>>
 }
 
 impl CommitLog {
-    pub fn new(storage_directory: path::PathBuf) -> Result<CommitLog, io::Error> {
+    pub fn new(storage_directory: &path::Path) -> Result<CommitLog, io::Error> {
         let file_path = storage_directory.join(path::Path::new("commit.log"));
-        trace!("commit_log: path is {:?}", file_path);
-        let log_file  = OpenOptions::new().append(true).open(&file_path)?;
+        let log_file  = OpenOptions::new()
+                        .create(true)
+                        .write(true)
+                        .append(true)
+                        .open(&file_path)?;
 
-        Ok(CommitLog{ path: file_path, writer: Arc::new(Mutex::new(log_file)) })
+        trace!("opened commit_log at {:?}", file_path);
+        Ok(CommitLog{ writer: Arc::new(Mutex::new(log_file)) })
     }
 
-    pub fn commitSet(&mut self, k: &Vec<u8>, v: &Vec<u8>) -> Result<usize, Error> {
-        self.writeOperation(&Operation::Set(k.clone(), v.clone()))
+    pub fn commit_set(&mut self, k: &[u8], v: &[u8]) -> Result<(), Error> {
+        self.write_operation(&Operation::Set(k, v))
     }
 
-    pub fn commitDelete(&mut self, k: &Vec<u8>) -> Result<usize, Error> {
-        self.writeOperation(&Operation::Delete(k.clone()))
+    pub fn commit_delete(&mut self, k: &[u8]) -> Result<(), Error> {
+        self.write_operation(&Operation::Delete(k))
     }
 
-    fn writeOperation(&mut self, operation: &Operation) -> Result<usize, Error> {
-        if let Ok(data) = bincode::serialize(operation) {
-            let mut writer = self.writer.lock()?;
-            let written    = writer.write(&data)?;
-            Ok(written)
-        } else {
-            Err(Error::SerializationError)
-        }
+    fn write_operation(&mut self, operation: &Operation) -> Result<(), Error> {
+      let data       = bincode::serialize(operation)?;
+      let mut writer = self.writer.lock()?;
+      let written    = writer.write(&data)?;
+      Ok(())
     }
 }
 

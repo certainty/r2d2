@@ -5,7 +5,7 @@
 //! purposes only.
 
 extern crate rustyline;
-use crate::engine::{Engine, Key, Value};
+use crate::engine::Engine;
 
 mod command;
 mod command_parser;
@@ -29,7 +29,8 @@ enum Output {
   Message(String),
 }
 
-pub fn run(engine: &mut Engine) {
+// TODO: add completer for commands
+pub fn run(engine: &mut impl Engine) {
   let mut editor = Editor::<()>::new();
   editor.load_history(HISTORY_FILE).ok();
   println!("r2d2 repl :: use :help to get help and :quit to exit");
@@ -52,8 +53,9 @@ fn read(editor: &mut Editor<()>) -> Result<Input, String> {
   let readline = editor.readline(">> ");
   match readline {
     Ok(line) => {
-      editor.add_history_entry(line.as_ref());
-      match command_parser::parse(&line) {
+      let l : &str = &line;
+      editor.add_history_entry(l);
+      match command_parser::parse(l) {
         Ok(cmd) => Result::Ok(Input::Cmd(cmd)),
         Err(_) => Result::Err(String::from("Invalid command")),
       }
@@ -64,45 +66,50 @@ fn read(editor: &mut Editor<()>) -> Result<Input, String> {
   }
 }
 
-fn eval(cmd: Command, engine: &mut Engine) -> Output {
+fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
   match cmd {
     Command::Quit => Output::Break,
 
     Command::Stats => Output::Message(String::from("Printing statistics")),
 
     Command::Insert(key, value) => {
-      match engine.insert(Key::from_string(key), Value::from_string(value)) {
+      match engine.insert(key.as_ref(), value.as_ref()) {
         Ok(_) => Output::Message(String::from("OK <>")),
         Err(msg) => Output::Error(msg),
       }
-    }
+    },
 
-    Command::Delete(key) => match engine.delete(Key::from_string(key)) {
-      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value_to_str(&value))),
+    Command::Delete(key) => match engine.delete(key.as_ref()) {
+      Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from(&value))),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
-    Command::Lookup(key) => match engine.lookup(Key::from_string(key)) {
-      Ok(Some(value)) => Output::Message(format!("OK <{:?}>", value_to_str(value))),
+    Command::Lookup(key) => match engine.lookup(key.as_ref()) {
+      Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from(value))),
       Ok(None) => Output::Message(String::from("OK <>")),
       Err(msg) => Output::Error(msg),
     },
 
     Command::ListKeys => match engine.list_keys() {
-      Ok(keys) => Output::Message(format!(
-        "OK <{:?}>",
-        keys.into_iter().map(|k| key_to_str(&k))
-      )),
-      Err(msg) => Output::Error(msg),
+      Ok(keys) =>  {
+        let keys_str: Vec<String> = keys.iter().map(|k| String::from(k)).collect();
+
+        Output::Message(format!(
+         "OK <{}>",
+         keys_str.join(", ")
+       ))
+     },
+
+     Err(msg) => Output::Error(msg),
     },
 
     Command::Help => Output::Message(String::from(
-      "
+    "
     The following comands are available
 
     :help\t\t\tShow this help
-    :stats\t\t\tShow statistics 
+    :stats\t\t\tShow statistics
     :list_keys\t\t\tList the currently known keys
     :insert <key> <value>\tInsert a new key value pair
     :lookup <key>\t\tFind the value for the given <key>
@@ -111,14 +118,6 @@ fn eval(cmd: Command, engine: &mut Engine) -> Output {
     ",
     )),
   }
-}
-
-fn value_to_str(value: &Value) -> String {
-  String::from_utf8(value.as_bytes().clone()).unwrap()
-}
-
-fn key_to_str(key: &Key) -> String {
-  String::from_utf8(key.as_bytes().clone()).unwrap()
 }
 
 fn print(output: Output) {

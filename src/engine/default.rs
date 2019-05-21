@@ -17,26 +17,32 @@ pub fn new(storage_directory: PathBuf) -> DefaultEngine {
   let storage_path = fs::canonicalize(&storage_directory).unwrap();
 
   DefaultEngine {
-    lsm: LSM::new(storage_path),
+    lsm: LSM::new(storage_path.as_path()),
     dict: BTreeMap::new(),
   }
 }
 
-impl<'a> Engine for DefaultEngine {
-  fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, String> {
-    trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
-    self.dict.insert(key, value);
+impl Engine for DefaultEngine {
+  fn insert(&mut self, key: impl Into<Key>, value: impl Into<Value>) -> Result<Option<Value>, String> {
+    let (k, v) = (key.into(), value.into());
+    trace!(target: "engine", "Insert {:?} -> {:?}", k, v);
+    self.lsm.insert(k.as_bytes(), v.as_bytes()).unwrap();
+    self.dict.insert(k, v);
     Ok(None)
   }
 
-  fn delete(&mut self, key: Key) -> Result<Option<Value>, String> {
-    trace!(target: "engine", "Delete {:?}", key);
-    Ok(self.dict.remove(&key))
+  fn delete(&mut self, key: impl Into<Key>) -> Result<Option<Value>, String> {
+    let k = key.into();
+
+    trace!(target: "engine", "Delete {:?}", k);
+    Ok(self.dict.remove(&k))
   }
 
-  fn lookup(&self, key: Key) -> Result<Option<&Value>, String> {
-    trace!(target: "engine", "Lookup {:?}", key);
-    Ok(self.dict.get(&key))
+  fn lookup(&self, key: impl Into<Key>) -> Result<Option<&Value>, String> {
+    let k = key.into();
+
+    trace!(target: "engine", "Lookup {:?}", k);
+    Ok(self.dict.get(&k))
   }
 
   fn list_keys(&self) -> Result<Vec<Key>, String> {
