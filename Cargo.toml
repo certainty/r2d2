@@ -8,16 +8,15 @@ edition = "2018"
 name="r2d2_lib"
 path="src/lib.rs"
 
-# [[bin]]
-# name="r2d2_server"
-# path="src/bin/server.rs"
-
 [dependencies]
 nom = "4.2.3"
 rustyline = "3.0.0"
 termion = "1.5.1"
 log = "0.4.6"
 env_logger = "0.6.1"
+serde = { version = "1.0.91", features = ["derive"]}
+bincode = "1.1.4"
+clap = "2.33.0"
 
 [dev-dependencies]
 simulacrum = "0.3.1"

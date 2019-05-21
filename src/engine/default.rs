@@ -1,21 +1,28 @@
 use super::{Engine, Key, Value};
+use super::storage::lsm::LSM;
 use log::trace;
 use std::collections::BTreeMap;
+use std::path::PathBuf;
+use std::fs;
 
 pub struct DefaultEngine {
   // The choice of a BTreeMap is kind of abritary at the moment,
   // since we don't care too much about the performance of the local
   // store so far.
+  lsm: LSM,
   dict: BTreeMap<Key, Value>,
 }
 
-pub fn new() -> DefaultEngine {
+pub fn new(storage_directory: PathBuf) -> DefaultEngine {
+  let storage_path = fs::canonicalize(&storage_directory).unwrap();
+
   DefaultEngine {
+    lsm: LSM::new(storage_path),
     dict: BTreeMap::new(),
   }
 }
 
-impl Engine for DefaultEngine {
+impl<'a> Engine for DefaultEngine {
   fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, String> {
     trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
     self.dict.insert(key, value);

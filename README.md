@@ -4,5 +4,5 @@ Learning project that implements a distibuted kv store that uses CURP for replic
 ## Run the repl to interact with the store
 
 ```
-cargo run --bin repl
+cargo run --bin r2d2 repl
 ```

@@ -1,5 +1,5 @@
 //! The engine is the main abstraction that you use
-//! to interact with the key-value store system.  
+//! to interact with the key-value store system.
 //!
 //! It takes care of maintaining the local state as well as providing
 //! the necessary data transfer to update the cluster state if required.
@@ -10,6 +10,7 @@
 //!
 
 pub mod default;
+pub mod storage;
 
 #[derive(Debug, Clone, Ord, Eq, PartialOrd, PartialEq, Hash)]
 pub struct Key(Vec<u8>);
