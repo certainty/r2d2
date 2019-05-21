@@ -18,6 +18,7 @@ serde = { version = "1.0.91", features = ["derive"]}
 bincode = "1.1.4"
 clap = "2.33.0"
 itertools = "0.8"
+skiplist = "0.2.10"
 
 [dev-dependencies]
 simulacrum = "0.3.1"

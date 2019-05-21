@@ -18,15 +18,16 @@ use std::fs::*;
 use log::trace;
 use std::convert::From;
 
+#[derive(Debug, PartialEq)]
 pub enum Error {
     SerializationError,
-    IoError(io::Error),
+    IoError(String),
     LockError
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
-        Error::IoError(e)
+        Error::IoError(e.to_string())
     }
 }
 
@@ -37,7 +38,7 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
 }
 
 impl From<std::boxed::Box<bincode::ErrorKind>> for Error {
-  fn from(e: std::boxed::Box<bincode::ErrorKind>) -> Self {
+  fn from(_e: std::boxed::Box<bincode::ErrorKind>) -> Self {
     Error::SerializationError
   }
 }

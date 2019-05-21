@@ -1,52 +1,63 @@
-use super::{Engine, Key, Value};
-use super::storage::lsm::LSM;
+//! Default engine implementation
+//!
+//! This module provides the default implementation for the storage engine.
+//! It uses a log structured merge tree architecture for local storage.
+//!
+//!
+
 use log::trace;
-use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::fs;
+
+use super::{Engine, Key, Value};
+use super::storage::lsm;
+use super::Error as EngineError;
+
+impl From<lsm::Error> for EngineError {
+  fn from(e: lsm::Error) -> Self {
+    super::Error::StorageError(e)
+  }
+}
 
 pub struct DefaultEngine {
   // The choice of a BTreeMap is kind of abritary at the moment,
   // since we don't care too much about the performance of the local
   // store so far.
-  lsm: LSM,
-  dict: BTreeMap<Key, Value>,
+  lsm: lsm::LSM
 }
 
 pub fn new(storage_directory: PathBuf) -> DefaultEngine {
   let storage_path = fs::canonicalize(&storage_directory).unwrap();
 
   DefaultEngine {
-    lsm: LSM::new(storage_path.as_path()),
-    dict: BTreeMap::new(),
+    lsm: lsm::LSM::new(storage_path.as_path())
   }
 }
 
 impl Engine for DefaultEngine {
-  fn insert(&mut self, key: impl Into<Key>, value: impl Into<Value>) -> Result<Option<Value>, String> {
-    let (k, v) = (key.into(), value.into());
-    trace!(target: "engine", "Insert {:?} -> {:?}", k, v);
-    self.lsm.insert(k.as_bytes(), v.as_bytes()).unwrap();
-    self.dict.insert(k, v);
+  fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
+    trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
+    self.lsm.insert(key.data, value.data)?;
     Ok(None)
   }
 
-  fn delete(&mut self, key: impl Into<Key>) -> Result<Option<Value>, String> {
-    let k = key.into();
-
-    trace!(target: "engine", "Delete {:?}", k);
-    Ok(self.dict.remove(&k))
+  fn delete(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
+    trace!(target: "engine", "Delete {:?}", key);
+    let value = self.lsm.remove(key.data)?;
+    Ok(value.map(|v| Value::new(v)))
   }
 
-  fn lookup(&self, key: impl Into<Key>) -> Result<Option<&Value>, String> {
-    let k = key.into();
+  fn lookup(&self, key: Key) -> Result<Option<Value>, EngineError> {
+    trace!(target: "engine", "Lookup {:?}", key);
+    let value = self.lsm.lookup(key.data)?;
 
-    trace!(target: "engine", "Lookup {:?}", k);
-    Ok(self.dict.get(&k))
+    Ok(value.map(|v| Value::new(v.clone())))
   }
 
-  fn list_keys(&self) -> Result<Vec<Key>, String> {
+  fn list_keys(&self) -> Result<Vec<Key>, EngineError> {
     trace!(target: "engine", "List keys");
-    Ok(self.dict.keys().cloned().collect())
+    let byte_keys = self.lsm.keys()?;
+    let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();
+    Ok(keys)
   }
 }

@@ -6,7 +6,7 @@
 
 extern crate rustyline;
 extern crate itertools;
-use crate::engine::Engine;
+use crate::engine::{Engine, Key, Value};
 
 mod command;
 mod command_parser;
@@ -75,33 +75,37 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
     Command::Stats => Output::Message(String::from("Printing statistics")),
 
     Command::Insert(key, value) => {
-      match engine.insert(key.as_ref(), value.as_ref()) {
+      match engine.insert(Key::from_string(&key), Value::from_string(&value)) {
         Ok(_)    => Output::Message(String::from("OK <>")),
-        Err(msg) => Output::Error(msg),
+        Err(msg) => Output::Error(format!("{:?}", msg)),
       }
     },
 
-    Command::Delete(key) => match engine.delete(key.as_ref()) {
-      Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from(&value))),
-      Ok(None) => Output::Message(String::from("OK <>")),
-      Err(msg) => Output::Error(msg),
+    Command::Delete(key) => {
+      match engine.delete(Key::from_string(&key)) {
+        Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap())),
+        Ok(None) => Output::Message(String::from("OK <>")),
+        Err(msg) => Output::Error(format!("{:?}", msg)),
+      }
     },
 
-    Command::Lookup(key) => match engine.lookup(key.as_ref()) {
-      Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from(value))),
-      Ok(None) => Output::Message(String::from("OK <>")),
-      Err(msg) => Output::Error(msg),
+    Command::Lookup(key) => {
+      match engine.lookup(Key::from_string(&key)) {
+        Ok(Some(value)) => Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap())),
+        Ok(None) => Output::Message(String::from("OK <>")),
+        Err(msg) => Output::Error(format!("{:?}", msg)),
+      }
     },
 
     Command::ListKeys => match engine.list_keys() {
       Ok(keys) =>  {
         Output::Message(format!(
          "OK <{}>",
-          keys.iter().map(|k| String::from(k)).join(", ")
+          keys.iter().map(|k| std::str::from_utf8(&k.data).unwrap()).join(", ")
        ))
      },
 
-     Err(msg) => Output::Error(msg),
+     Err(msg) => Output::Error(format!("{:?}", msg)),
     },
 
     Command::Help => Output::Message(String::from(
