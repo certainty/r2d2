@@ -69,6 +69,28 @@ impl CommitLog {
         self.write_operation(&Operation::Delete(k))
     }
 
+    pub fn each_operation<F>(&mut self, f: F)
+    where
+        F: Fn(Operation),
+    {
+        let mut store = self.backing_store.lock().unwrap();
+        let mut buf = Vec::new();
+
+        store.rewind_for_read();
+        while true {
+            match store.read(&mut buf) {
+                Ok(_) => {
+                    let op = bincode::deserialize(&buf).unwrap();
+                    f(op)
+                }
+                _ => {
+                    println!("Error!");
+                    break;
+                }
+            }
+        }
+    }
+
     fn write_operation(&mut self, operation: &Operation) -> Result<(), Error> {
         let data = bincode::serialize(operation)?;
         self.backing_store.lock()?.write(&data)?;

@@ -1,7 +1,4 @@
 use std::fs;
-use std::fs::{File, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
 
 pub static TEST_DIRECTORY: &str = "tmp/r2d2";
 pub static TEST_STORAGE_DIRECTORY: &str = "/tmp/r2d2/storage";
