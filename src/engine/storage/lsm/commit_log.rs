@@ -8,21 +8,22 @@
 //! the ultimate control over when the write happens to the OS at the benefit of a faster
 //! write through the FS cache.
 
-use serde::{Serialize, Deserialize};
-use std::sync::{Arc, Mutex};
-use std::io;
-use std::io::Write;
-use std::result::Result;
-use std::path;
-use std::fs::*;
-use log::trace;
 use std::convert::From;
+use std::io;
+use std::result::Result;
+use std::sync::{Arc, Mutex};
+
+use serde::{Deserialize, Serialize};
+
+use backing_store::BackingStore;
+
+pub mod backing_store;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
     SerializationError,
     IoError(String),
-    LockError
+    LockError,
 }
 
 impl From<io::Error> for Error {
@@ -38,32 +39,26 @@ impl<T> From<std::sync::PoisonError<T>> for Error {
 }
 
 impl From<std::boxed::Box<bincode::ErrorKind>> for Error {
-  fn from(_e: std::boxed::Box<bincode::ErrorKind>) -> Self {
-    Error::SerializationError
-  }
+    fn from(_e: std::boxed::Box<bincode::ErrorKind>) -> Self {
+        Error::SerializationError
+    }
 }
 
 #[derive(Serialize, Deserialize, Debug)]
-enum Operation<'a> {
-    Set(& 'a [u8], & 'a [u8]),
-    Delete(& 'a [u8]),
+pub enum Operation<'a> {
+    Set(&'a [u8], &'a [u8]),
+    Delete(&'a [u8]),
 }
 
 pub struct CommitLog {
-    writer: Arc<Mutex<File>>
+    backing_store: Arc<Mutex<BackingStore>>,
 }
 
 impl CommitLog {
-    pub fn new(storage_directory: &path::Path) -> Result<CommitLog, io::Error> {
-        let file_path = storage_directory.join(path::Path::new("commit.log"));
-        let log_file  = OpenOptions::new()
-                        .create(true)
-                        .write(true)
-                        .append(true)
-                        .open(&file_path)?;
-
-        trace!("opened commit_log at {:?}", file_path);
-        Ok(CommitLog{ writer: Arc::new(Mutex::new(log_file)) })
+    pub fn new(store: impl BackingStore + 'static) -> Result<CommitLog, io::Error> {
+        Ok(CommitLog {
+            backing_store: Arc::new(Mutex::new(store)),
+        })
     }
 
     pub fn commit_set(&mut self, k: &[u8], v: &[u8]) -> Result<(), Error> {
@@ -75,9 +70,9 @@ impl CommitLog {
     }
 
     fn write_operation(&mut self, operation: &Operation) -> Result<(), Error> {
-      let data = bincode::serialize(operation)?;
-      self.writer.lock()?.write(&data)?;
-      Ok(())
+        let data = bincode::serialize(operation)?;
+        self.backing_store.lock()?.write(&data)?;
+
+        Ok(())
     }
 }
-
