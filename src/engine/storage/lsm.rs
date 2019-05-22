@@ -37,7 +37,8 @@ pub struct LSM {
 
 impl LSM {
     pub fn new(storage_directory: &Path) -> LSM {
-        let backing_store = FileBackingStore::new(storage_directory).unwrap();
+        let backing_store =
+            FileBackingStore::new(storage_directory.join("commit.log").as_path()).unwrap();
         let commit_log = CommitLog::new(backing_store).unwrap();
         let memtable = SkipMap::new();
 
