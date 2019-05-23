@@ -140,7 +140,10 @@ impl CommitLogReader {
         let mut reader = fs::OpenOptions::new().read(true).open(path)?;
         let header: FileHeader = read_data(&mut reader)?;
 
-        trace!("header read");
+        trace!(
+            "commit log successfullt opened. version = {}",
+            header.version
+        );
 
         Ok(CommitLogReader {
             header,
