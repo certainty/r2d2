@@ -5,7 +5,7 @@
 //!
 //!
 
-use log::trace;
+use log::{info, trace};
 use std::fs;
 use std::path::PathBuf;
 
@@ -26,6 +26,8 @@ pub struct DefaultEngine {
 pub fn new(storage_directory: PathBuf) -> DefaultEngine {
     let storage_path = fs::canonicalize(&storage_directory).unwrap();
     let lsm = lsm::new(storage_path.as_path()).unwrap();
+
+    info!("lsm subsystem initialized and ready");
 
     DefaultEngine { lsm }
 }
