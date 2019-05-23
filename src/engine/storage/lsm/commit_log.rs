@@ -74,7 +74,7 @@ impl FileHeader {
     }
 }
 
-#[derive(Deserialize, PartialEq)]
+#[derive(Deserialize, PartialEq, Debug)]
 pub enum Operation {
     Set(Vec<u8>, Vec<u8>),
     Delete(Vec<u8>),
