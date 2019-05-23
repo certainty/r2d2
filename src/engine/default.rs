@@ -34,26 +34,26 @@ pub fn new(storage_directory: PathBuf) -> DefaultEngine {
 }
 
 impl Engine for DefaultEngine {
-    fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
+    fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
         self.lsm.set(key.data, value.data)?;
         Ok(None)
     }
 
-    fn delete(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
+    fn del(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Delete {:?}", key);
-        let value = self.lsm.remove(key.data)?;
+        let value = self.lsm.del(key.data)?;
         Ok(value.map(|v| Value::new(v)))
     }
 
-    fn lookup(&self, key: Key) -> Result<Option<Value>, EngineError> {
+    fn get(&self, key: Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Lookup {:?}", key);
-        let value = self.lsm.lookup(key.data)?;
+        let value = self.lsm.get(key.data)?;
 
         Ok(value.map(|v| Value::new(v.clone())))
     }
 
-    fn list_keys(&self) -> Result<Vec<Key>, EngineError> {
+    fn keys(&self) -> Result<Vec<Key>, EngineError> {
         trace!(target: "engine", "List keys");
         let byte_keys = self.lsm.keys()?;
         let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();

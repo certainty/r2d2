@@ -52,12 +52,12 @@ impl LSM {
         Ok(())
     }
 
-    pub fn remove(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
         self.commit_log.write_delete(&k)?;
         Ok(self.memtable.remove(&k))
     }
 
-    pub fn lookup(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>> {
+    pub fn get(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>> {
         Ok(self.memtable.get(&k))
     }
 

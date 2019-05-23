@@ -11,30 +11,30 @@ fn basic_operation_works() {
     env_logger::init();
     let mut ngin = engine::default::new(PathBuf::from(TEST_ENGINE_DIRECTORY));
 
-    assert_eq!(ngin.lookup(Key::from_string("foo")), Ok(None));
+    assert_eq!(ngin.get(Key::from_string("foo")), Ok(None));
 
     assert_eq!(
-        ngin.insert(Key::from_string("foo"), Value::from_string("bar")),
+        ngin.set(Key::from_string("foo"), Value::from_string("bar")),
         Ok(None)
     );
 
     assert_eq!(
-        ngin.lookup(Key::from_string("foo")),
+        ngin.get(Key::from_string("foo")),
         Ok(Some(Value::from_string("bar")))
     );
 
-    ngin.insert(Key::from_string("foo"), Value::from_string("updated"))
+    ngin.set(Key::from_string("foo"), Value::from_string("updated"))
         .unwrap();
 
     assert_eq!(
-        ngin.lookup(Key::from_string("foo")),
+        ngin.get(Key::from_string("foo")),
         Ok(Some(Value::from_string("updated")))
     );
 
     assert_eq!(
-        ngin.delete(Key::from_string("foo")),
+        ngin.del(Key::from_string("foo")),
         Ok(Some(Value::from_string("updated")))
     );
 
-    assert_eq!(ngin.lookup(Key::from_string("foo")), Ok(None));
+    assert_eq!(ngin.get(Key::from_string("foo")), Ok(None));
 }
