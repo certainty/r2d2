@@ -20,9 +20,6 @@ impl From<lsm::Error> for EngineError {
 }
 
 pub struct DefaultEngine {
-    // The choice of a BTreeMap is kind of abritary at the moment,
-    // since we don't care too much about the performance of the local
-    // store so far.
     lsm: lsm::LSM,
 }
 

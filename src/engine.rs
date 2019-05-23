@@ -10,6 +10,8 @@
 //! It presents itself with a dictionary-like interfacer where each operation
 //! might fail. This is deliberate since every operation has to potentially interact
 //! with the OS or the network which are unreliable components.
+use std::ops::Deref;
+
 pub mod default;
 pub mod storage;
 
@@ -32,9 +34,25 @@ impl Key {
     }
 }
 
+impl Deref for Key {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
+}
+
 #[derive(Debug, PartialEq)]
 pub struct Value {
     pub data: Vec<u8>,
+}
+
+impl Deref for Value {
+    type Target = Vec<u8>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.data
+    }
 }
 
 impl Value {
@@ -49,7 +67,7 @@ impl Value {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(PartialEq, Debug)]
 pub enum Error {
     StorageError(storage::lsm::Error),
 }

@@ -8,7 +8,6 @@ use utils::*;
 #[test]
 fn basic_operation_works() {
     setup();
-    env_logger::init();
     let mut ngin = engine::default::new(PathBuf::from(TEST_ENGINE_DIRECTORY));
 
     assert_eq!(ngin.get(Key::from_string("foo")), Ok(None));

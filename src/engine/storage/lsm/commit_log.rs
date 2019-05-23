@@ -20,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
+use log::trace;
 use std::io::{BufReader, BufWriter, Read};
 
 const VERSION: u8 = 1;
@@ -123,7 +124,7 @@ impl CommitLogWriter {
         })
     }
 
-    pub fn write(&mut self, op: Operation<&Vec<u8>>) -> Result<usize> {
+    pub fn write(&mut self, op: Operation<&[u8]>) -> Result<usize> {
         let mut file = self.file.lock()?;
         write_data(&mut *file, op)
     }
@@ -138,6 +139,8 @@ impl CommitLogReader {
     pub fn open(path: &path::Path) -> Result<CommitLogReader> {
         let mut reader = fs::OpenOptions::new().read(true).open(path)?;
         let header: FileHeader = read_data(&mut reader)?;
+
+        trace!("header read");
 
         Ok(CommitLogReader {
             header,
@@ -181,7 +184,10 @@ where
 {
     let mut buf = Vec::new();
     read_frame(r, &mut buf)?;
-    let value = bincode::deserialize(buf.as_slice()).map_err(|_e| Error::SerializationError)?;
+    let value = bincode::deserialize(buf.as_slice()).map_err(|e| {
+        trace!("error: {:?}", e.as_ref());
+        Error::SerializationError
+    })?;
     Ok(value)
 }
 
@@ -190,6 +196,7 @@ where
     R: io::Read,
 {
     let size = reader.read_u64::<LittleEndian>()?;
+    trace!("Attempting to read {} bytes", size);
     reader.take(size).read_to_end(buf)?;
     Ok(size as usize)
 }
@@ -220,5 +227,15 @@ mod tests {
         let op: Operation<Vec<u8>> = read_data(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
+    }
+
+    #[test]
+    fn write_to_null_log() {
+        let mut writer = null().unwrap();
+        let foo = "foo".as_bytes();
+        let bar = "bar".as_bytes();
+
+        assert!(writer.write(Operation::Set(foo, bar)).is_ok());
+        assert!(writer.write(Operation::Set(foo, bar)).is_ok());
     }
 }

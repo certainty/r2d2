@@ -11,6 +11,7 @@
 extern crate skiplist;
 pub mod commit_log;
 
+use log::{info, trace};
 use skiplist::SkipMap;
 use std::path::Path;
 use std::result;
@@ -38,13 +39,55 @@ pub struct LSM {
 const COMMIT_LOG_NAME: &str = "commit.log";
 
 pub fn new(storage_directory: &Path) -> Result<LSM> {
-    let commit_log = commit_log::resume(storage_directory.join("commit.log").as_path())?;
-    let memtable = SkipMap::new();
+    let mut memtable = SkipMap::new();
+    let commit_log_path = storage_directory.join(COMMIT_LOG_NAME);
 
-    Ok(LSM {
-        commit_log: commit_log,
-        memtable: memtable,
-    })
+    if commit_log_path.exists() {
+        trace!("commit log exists, will try to repair");
+
+        let mut lsm = LSM {
+            commit_log: commit_log::null()?,
+            memtable,
+        };
+
+        repair(&mut lsm, commit_log_path.as_path())?;
+
+        Ok(LSM {
+            commit_log: commit_log::resume(commit_log_path.as_path())?,
+            ..lsm
+        })
+    } else {
+        trace!("creating new commit log at: {:?}", commit_log_path);
+
+        Ok(LSM {
+            commit_log: commit_log::create(commit_log_path.as_path())?,
+            memtable,
+        })
+    }
+}
+
+fn repair(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
+    trace!(
+        "trying to restore state from commit log at: {:?}",
+        commit_log_path
+    );
+
+    let mut reader = commit_log::open(commit_log_path)?;
+
+    for result_of_op in reader {
+        match result_of_op? {
+            commit_log::Operation::Set(key, value) => {
+                lsm.set(key, value)?;
+                ()
+            }
+            commit_log::Operation::Delete(key) => {
+                lsm.del(key)?;
+                ()
+            }
+        }
+    }
+
+    Ok(())
 }
 
 impl LSM {
