@@ -78,20 +78,10 @@ impl FileHeader {
     }
 }
 
-#[derive(Deserialize, PartialEq, Debug)]
-pub enum Operation {
-    Set(Vec<u8>, Vec<u8>),
-    Delete(Vec<u8>),
-}
-
-// internal reqresentation of an operation frame
-// that is written to the commit log.
-// This allows for zero copy writes, while the owned version still
-// can be used for read
-#[derive(Serialize, Deserialize, PartialEq)]
-enum OperationFrame<'a> {
-    Set(&'a [u8], &'a [u8]),
-    Delete(&'a [u8]),
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+pub enum Operation<T> {
+    Set(T, T),
+    Delete(T),
 }
 
 pub struct CommitLogWriter {
@@ -133,14 +123,9 @@ impl CommitLogWriter {
         })
     }
 
-    pub fn write_set(&mut self, k: &Vec<u8>, v: &Vec<u8>) -> Result<usize> {
+    pub fn write(&mut self, op: Operation<&Vec<u8>>) -> Result<usize> {
         let mut file = self.file.lock()?;
-        write_data(&mut *file, OperationFrame::Set(k, v))
-    }
-
-    pub fn write_delete(&mut self, k: &Vec<u8>) -> Result<usize> {
-        let mut file = self.file.lock()?;
-        write_data(&mut *file, OperationFrame::Delete(k))
+        write_data(&mut *file, op)
     }
 }
 
@@ -160,13 +145,13 @@ impl CommitLogReader {
         })
     }
 
-    pub fn read(&mut self) -> Result<Operation> {
+    pub fn read(&mut self) -> Result<Operation<Vec<u8>>> {
         read_data(&mut self.file)
     }
 }
 
 impl Iterator for CommitLogReader {
-    type Item = Result<Operation>;
+    type Item = Result<Operation<Vec<u8>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.read() {
@@ -228,11 +213,11 @@ mod tests {
         let foo = "foo".as_bytes();
         let bar = "bar".as_bytes();
 
-        assert!(write_data(&mut writer, OperationFrame::Set(foo, bar)).is_ok());
+        assert!(write_data(&mut writer, Operation::Set(foo, bar)).is_ok());
 
         let mut reader = io::Cursor::new(writer.into_inner());
 
-        let op: Operation = read_data(&mut reader).unwrap();
+        let op: Operation<Vec<u8>> = read_data(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
     }

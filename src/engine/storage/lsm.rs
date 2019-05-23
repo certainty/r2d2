@@ -49,13 +49,13 @@ pub fn new(storage_directory: &Path) -> Result<LSM> {
 
 impl LSM {
     pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<()> {
-        self.commit_log.write_set(&k, &v)?;
+        self.commit_log.write(commit_log::Operation::Set(&k, &v))?;
         self.memtable.insert(k, v);
         Ok(())
     }
 
     pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.commit_log.write_delete(&k)?;
+        self.commit_log.write(commit_log::Operation::Delete(&k))?;
         Ok(self.memtable.remove(&k))
     }
 

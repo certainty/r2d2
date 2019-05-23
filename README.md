@@ -6,3 +6,9 @@ Learning project that implements a distibuted kv store that uses CURP for replic
 ```
 cargo run --bin r2d2 repl
 ```
+
+## Run the tests
+
+```
+RUST_TEST_THREADS=1 cargo test -- --nocapture
+```
