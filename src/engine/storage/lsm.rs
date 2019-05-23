@@ -43,7 +43,7 @@ pub fn new(storage_directory: &Path) -> Result<LSM> {
     let commit_log_path = storage_directory.join(COMMIT_LOG_NAME);
 
     if commit_log_path.exists() {
-        trace!("commit log exists, will try to repair");
+        info!("commit log exists, will try to repair");
 
         let mut lsm = LSM {
             commit_log: commit_log::null()?,
@@ -51,13 +51,17 @@ pub fn new(storage_directory: &Path) -> Result<LSM> {
         };
 
         repair(&mut lsm, commit_log_path.as_path())?;
+        info!("state is restored successfully");
 
         Ok(LSM {
             commit_log: commit_log::resume(commit_log_path.as_path())?,
             ..lsm
         })
     } else {
-        trace!("creating new commit log at: {:?}", commit_log_path);
+        info!(
+            "starting lsm with fresh commit log at {:?}",
+            commit_log_path
+        );
 
         Ok(LSM {
             commit_log: commit_log::create(commit_log_path.as_path())?,
@@ -67,8 +71,8 @@ pub fn new(storage_directory: &Path) -> Result<LSM> {
 }
 
 fn repair(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
-    trace!(
-        "trying to restore state from commit log at: {:?}",
+    info!(
+        "repairing local state from commit log at: {:?}",
         commit_log_path
     );
 

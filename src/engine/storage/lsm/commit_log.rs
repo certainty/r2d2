@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
-use log::trace;
+use log::{error, trace};
 use std::io::{BufReader, BufWriter, Read};
 
 const VERSION: u8 = 1;
@@ -171,7 +171,11 @@ where
     W: io::Write,
     D: serde::Serialize,
 {
-    let serialized = bincode::serialize(&data).map_err(|_| Error::SerializationError)?;
+    let serialized = bincode::serialize(&data).map_err(|e| {
+        error!("serialization of data frame failed: {:?}", e.as_ref());
+        Error::SerializationError
+    })?;
+
     write_frame(w, &serialized)
 }
 
@@ -185,7 +189,7 @@ where
     let mut buf = Vec::new();
     read_frame(r, &mut buf)?;
     let value = bincode::deserialize(buf.as_slice()).map_err(|e| {
-        trace!("error: {:?}", e.as_ref());
+        error!("deserialization of data frame failed: {:?}", e.as_ref());
         Error::SerializationError
     })?;
     Ok(value)
@@ -196,7 +200,6 @@ where
     R: io::Read,
 {
     let size = reader.read_u64::<LittleEndian>()?;
-    trace!("Attempting to read {} bytes", size);
     reader.take(size).read_to_end(buf)?;
     Ok(size as usize)
 }
