@@ -28,9 +28,9 @@ pub struct DefaultEngine {
 
 pub fn new(storage_directory: PathBuf) -> DefaultEngine {
     let storage_path = fs::canonicalize(&storage_directory).unwrap();
-    let lsm = lsm::LSM::new(storage_path.as_path()).unwrap();
+    let lsm = lsm::new(storage_path.as_path()).unwrap();
 
-    DefaultEngine { lsm: lsm }
+    DefaultEngine { lsm }
 }
 
 impl Engine for DefaultEngine {

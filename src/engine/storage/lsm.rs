@@ -35,17 +35,19 @@ pub struct LSM {
     memtable: Memtable,
 }
 
+const COMMIT_LOG_NAME: &str = "commit.log";
+
+pub fn new(storage_directory: &Path) -> Result<LSM> {
+    let commit_log = commit_log::resume(storage_directory.join("commit.log").as_path())?;
+    let memtable = SkipMap::new();
+
+    Ok(LSM {
+        commit_log: commit_log,
+        memtable: memtable,
+    })
+}
+
 impl LSM {
-    pub fn new(storage_directory: &Path) -> Result<LSM> {
-        let commit_log = commit_log::resume(storage_directory.join("commit.log").as_path())?;
-        let memtable = SkipMap::new();
-
-        Ok(LSM {
-            commit_log: commit_log,
-            memtable: memtable,
-        })
-    }
-
     pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<()> {
         self.commit_log.write_set(&k, &v)?;
         self.memtable.insert(k, v);

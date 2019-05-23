@@ -18,7 +18,7 @@ use std::sync::{Arc, Mutex};
 use serde;
 use serde::{Deserialize, Serialize};
 
-use byteorder::LittleEndian as Endianess;
+use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use std::io::{BufReader, BufWriter, Read};
 
@@ -38,6 +38,10 @@ pub fn create(path: &path::Path) -> Result<CommitLogWriter> {
 
 pub fn resume(path: &path::Path) -> Result<CommitLogWriter> {
     CommitLogWriter::resume(path)
+}
+
+pub fn null() -> Result<CommitLogWriter> {
+    CommitLogWriter::null()
 }
 
 #[derive(Debug, PartialEq)]
@@ -81,6 +85,9 @@ pub enum Operation {
 }
 
 // internal reqresentation of an operation frame
+// that is written to the commit log.
+// This allows for zero copy writes, while the owned version still
+// can be used for read
 #[derive(Serialize, Deserialize, PartialEq)]
 enum OperationFrame<'a> {
     Set(&'a [u8], &'a [u8]),
@@ -98,6 +105,17 @@ impl CommitLogWriter {
             .append(true)
             .write(true)
             .open(path)?;
+
+        Ok(CommitLogWriter {
+            file: Arc::new(Mutex::new(BufWriter::new(writer))),
+        })
+    }
+
+    pub fn null() -> Result<CommitLogWriter> {
+        let writer = fs::OpenOptions::new()
+            .append(true)
+            .write(true)
+            .open(path::Path::new("/dev/null"))?;
 
         Ok(CommitLogWriter {
             file: Arc::new(Mutex::new(BufWriter::new(writer))),
@@ -186,7 +204,7 @@ fn read_frame<R>(reader: &mut R, buf: &mut Vec<u8>) -> Result<usize>
 where
     R: io::Read,
 {
-    let size = reader.read_u64::<Endianess>()?;
+    let size = reader.read_u64::<LittleEndian>()?;
     reader.take(size).read_to_end(buf)?;
     Ok(size as usize)
 }
@@ -195,8 +213,27 @@ fn write_frame<W>(writer: &mut W, data: &[u8]) -> Result<usize>
 where
     W: io::Write,
 {
-    writer.write_u64::<Endianess>(data.len() as u64)?;
+    writer.write_u64::<LittleEndian>(data.len() as u64)?;
     writer.write_all(data)?;
     writer.flush()?;
     Ok(data.len())
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn read_your_write() {
+        let mut writer = io::Cursor::new(Vec::new());
+        let foo = "foo".as_bytes();
+        let bar = "bar".as_bytes();
+
+        assert!(write_data(&mut writer, OperationFrame::Set(foo, bar)).is_ok());
+
+        let mut reader = io::Cursor::new(writer.into_inner());
+
+        let op: Operation = read_data(&mut reader).unwrap();
+
+        assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
+    }
 }

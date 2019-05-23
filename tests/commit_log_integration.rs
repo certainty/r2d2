@@ -6,10 +6,6 @@ use r2d2_lib::engine::storage::lsm::commit_log;
 use tempfile;
 use utils::*;
 
-fn str_vec(s: &str) -> Vec<u8> {
-    s.as_bytes().to_vec()
-}
-
 #[test]
 fn check_commit_log_works() {
     setup();
@@ -64,7 +60,7 @@ fn check_commit_log_iterator() {
 fn check_iterator_empty_file() {
     setup();
     let file = tempfile::NamedTempFile::new_in(TEST_STORAGE_DIRECTORY).unwrap();
-    let mut log_writer = commit_log::create(file.path()).unwrap();
+    let _log_writer = commit_log::create(file.path()).unwrap();
     let mut log_reader = commit_log::open(file.path()).unwrap();
 
     assert!(log_reader.next().is_none());
