@@ -11,11 +11,11 @@
 extern crate skiplist;
 pub mod commit_log;
 
-use commit_log::backing_store::FileBackingStore;
-use commit_log::CommitLog;
 use skiplist::SkipMap;
 use std::path::Path;
-use std::result::Result;
+use std::result;
+
+type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
@@ -31,39 +31,37 @@ impl From<commit_log::Error> for Error {
 type Memtable = SkipMap<Vec<u8>, Vec<u8>>;
 
 pub struct LSM {
-    commit_log: CommitLog,
+    commit_log: commit_log::CommitLogWriter,
     memtable: Memtable,
 }
 
 impl LSM {
-    pub fn new(storage_directory: &Path) -> LSM {
-        let backing_store =
-            FileBackingStore::new(storage_directory.join("commit.log").as_path()).unwrap();
-        let commit_log = CommitLog::new(backing_store).unwrap();
+    pub fn new(storage_directory: &Path) -> Result<LSM> {
+        let commit_log = commit_log::resume(storage_directory.join("commit.log").as_path())?;
         let memtable = SkipMap::new();
 
-        LSM {
+        Ok(LSM {
             commit_log: commit_log,
             memtable: memtable,
-        }
+        })
     }
 
-    pub fn insert(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<(), Error> {
-        self.commit_log.commit_set(k.as_slice(), v.as_slice())?;
+    pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<()> {
+        self.commit_log.write_set(&k, &v)?;
         self.memtable.insert(k, v);
         Ok(())
     }
 
-    pub fn remove(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>, Error> {
-        self.commit_log.commit_delete(k.as_slice())?;
+    pub fn remove(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
+        self.commit_log.write_delete(&k)?;
         Ok(self.memtable.remove(&k))
     }
 
-    pub fn lookup(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>, Error> {
+    pub fn lookup(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>> {
         Ok(self.memtable.get(&k))
     }
 
-    pub fn keys(&self) -> Result<Vec<&Vec<u8>>, Error> {
+    pub fn keys(&self) -> Result<Vec<&Vec<u8>>> {
         Ok(self.memtable.keys().collect())
     }
 }

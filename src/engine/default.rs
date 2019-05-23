@@ -6,58 +6,57 @@
 //!
 
 use log::trace;
-use std::path::PathBuf;
 use std::fs;
+use std::path::PathBuf;
 
-use super::{Engine, Key, Value};
 use super::storage::lsm;
 use super::Error as EngineError;
+use super::{Engine, Key, Value};
 
 impl From<lsm::Error> for EngineError {
-  fn from(e: lsm::Error) -> Self {
-    super::Error::StorageError(e)
-  }
+    fn from(e: lsm::Error) -> Self {
+        super::Error::StorageError(e)
+    }
 }
 
 pub struct DefaultEngine {
-  // The choice of a BTreeMap is kind of abritary at the moment,
-  // since we don't care too much about the performance of the local
-  // store so far.
-  lsm: lsm::LSM
+    // The choice of a BTreeMap is kind of abritary at the moment,
+    // since we don't care too much about the performance of the local
+    // store so far.
+    lsm: lsm::LSM,
 }
 
 pub fn new(storage_directory: PathBuf) -> DefaultEngine {
-  let storage_path = fs::canonicalize(&storage_directory).unwrap();
+    let storage_path = fs::canonicalize(&storage_directory).unwrap();
+    let lsm = lsm::LSM::new(storage_path.as_path()).unwrap();
 
-  DefaultEngine {
-    lsm: lsm::LSM::new(storage_path.as_path())
-  }
+    DefaultEngine { lsm: lsm }
 }
 
 impl Engine for DefaultEngine {
-  fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
-    trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
-    self.lsm.insert(key.data, value.data)?;
-    Ok(None)
-  }
+    fn insert(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
+        trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
+        self.lsm.set(key.data, value.data)?;
+        Ok(None)
+    }
 
-  fn delete(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
-    trace!(target: "engine", "Delete {:?}", key);
-    let value = self.lsm.remove(key.data)?;
-    Ok(value.map(|v| Value::new(v)))
-  }
+    fn delete(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
+        trace!(target: "engine", "Delete {:?}", key);
+        let value = self.lsm.remove(key.data)?;
+        Ok(value.map(|v| Value::new(v)))
+    }
 
-  fn lookup(&self, key: Key) -> Result<Option<Value>, EngineError> {
-    trace!(target: "engine", "Lookup {:?}", key);
-    let value = self.lsm.lookup(key.data)?;
+    fn lookup(&self, key: Key) -> Result<Option<Value>, EngineError> {
+        trace!(target: "engine", "Lookup {:?}", key);
+        let value = self.lsm.lookup(key.data)?;
 
-    Ok(value.map(|v| Value::new(v.clone())))
-  }
+        Ok(value.map(|v| Value::new(v.clone())))
+    }
 
-  fn list_keys(&self) -> Result<Vec<Key>, EngineError> {
-    trace!(target: "engine", "List keys");
-    let byte_keys = self.lsm.keys()?;
-    let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();
-    Ok(keys)
-  }
+    fn list_keys(&self) -> Result<Vec<Key>, EngineError> {
+        trace!(target: "engine", "List keys");
+        let byte_keys = self.lsm.keys()?;
+        let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();
+        Ok(keys)
+    }
 }
