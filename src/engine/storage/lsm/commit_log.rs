@@ -43,13 +43,13 @@ pub fn resume(path: &path::Path) -> Result<CommitLogWriter> {
 #[derive(Debug, PartialEq)]
 pub enum Error {
     SerializationError,
-    IoError(String),
+    IoError(io::ErrorKind),
     LockError,
 }
 
 impl From<io::Error> for Error {
     fn from(e: io::Error) -> Self {
-        Error::IoError(e.to_string())
+        Error::IoError(e.kind())
     }
 }
 
@@ -137,13 +137,25 @@ impl CommitLogReader {
         let header: FileHeader = read_data(&mut reader)?;
 
         Ok(CommitLogReader {
-            header: header,
+            header,
             file: BufReader::new(reader),
         })
     }
 
     pub fn read(&mut self) -> Result<Operation> {
         read_data(&mut self.file)
+    }
+}
+
+impl Iterator for CommitLogReader {
+    type Item = Result<Operation>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.read() {
+            Err(Error::IoError(io::ErrorKind::UnexpectedEof)) => None,
+            Err(e) => Some(Err(e)),
+            ok => Some(ok),
+        }
     }
 }
 
