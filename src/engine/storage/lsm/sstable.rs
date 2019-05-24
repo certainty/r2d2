@@ -1,6 +1,5 @@
 use super::binary_io as binio;
 use log::trace;
-use serde;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -168,20 +167,21 @@ pub struct Reader {
 impl Reader {
     pub fn open(path: &path::Path) -> Result<Self> {
         let mut file = io::BufReader::new(OpenOptions::new().read(true).open(path)?);
-        let meta = Reader::read_meta(file)?;
+        let meta = Reader::read_meta(&mut file)?;
         file.seek(SeekFrom::Start(0))?;
 
         Ok(Reader { file, meta })
     }
 
-    fn read_meta(mut file: ReaderStorage) -> Result<Meta> {
+    fn read_meta(file: &mut ReaderStorage) -> Result<Meta> {
         file.seek(SeekFrom::End(-8))?;
-        let trailer_offset = binio::read_u64(&mut file)?;
-        file.seek(SeekFrom::Start(trailer_offset))?;
+        let trailer_offset = binio::read_u64(file)?;
 
-        let trailer: Trailer = binio::read_data(&mut file)?;
+        file.seek(SeekFrom::Start(trailer_offset))?;
+        let trailer: Trailer = binio::read_data(file)?;
+
         file.seek(SeekFrom::Start(trailer.start_of_meta_block as u64))?;
-        let meta: Meta = binio::read_data(&mut file)?;
+        let meta: Meta = binio::read_data(file)?;
 
         Ok(meta)
     }
