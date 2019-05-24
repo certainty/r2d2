@@ -26,24 +26,47 @@ use std::path::PathBuf;
 
 const VERSION: u8 = 1;
 const STANZA: &str = "r2d2::wal";
+const WAL_FILE_NAME: &str = "write_ahead.log";
 
 type Result<T> = std::result::Result<T, Error>;
 
 // public API
-pub fn open(path: &path::Path) -> Result<WalReader> {
-    WalReader::open(path)
+pub fn init(storage_path: &path::Path) -> Result<Wal> {
+    let wal_path = storage_path.join("wal");
+    let wal_file_name = wal_path.join(WAL_FILE_NAME);
+    std::fs::create_dir_all(&wal_path)?;
+
+    Ok(Wal {
+        directory: wal_path,
+        active_file: wal_file_name,
+    })
 }
 
-pub fn create(path: &path::Path) -> Result<WalWriter> {
-    WalWriter::create(path)
+pub struct Wal {
+    directory: path::PathBuf,
+    active_file: path::PathBuf,
 }
 
-pub fn resume(path: &path::Path) -> Result<WalWriter> {
-    WalWriter::resume(path)
-}
+impl Wal {
+    pub fn recovery_needed(&self) -> bool {
+        self.active_file.exists()
+    }
 
-pub fn null() -> Result<WalWriter> {
-    WalWriter::null()
+    pub fn create(&self) -> Result<WalWriter> {
+        WalWriter::create(&self.active_file)
+    }
+
+    pub fn open(&self) -> Result<WalReader> {
+        WalReader::open(&self.active_file)
+    }
+
+    pub fn resume(&self) -> Result<WalWriter> {
+        WalWriter::resume(&self.active_file)
+    }
+
+    pub fn null(&self) -> Result<WalWriter> {
+        WalWriter::null()
+    }
 }
 
 #[derive(Debug, PartialEq)]
@@ -235,15 +258,5 @@ mod tests {
         let op: Operation<Vec<u8>> = read_data(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
-    }
-
-    #[test]
-    fn write_to_null_log() {
-        let mut writer = null().unwrap();
-        let foo = "foo".as_bytes();
-        let bar = "bar".as_bytes();
-
-        assert!(writer.write(Operation::Set(foo, bar)).is_ok());
-        assert!(writer.write(Operation::Set(foo, bar)).is_ok());
     }
 }
