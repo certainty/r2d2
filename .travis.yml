@@ -3,5 +3,5 @@ rust:
   - stable
 cache: cargo
 script:
-  - cargo build --verbose all
-  - cargo test --lib
+  - cargo build --verbose
+  - cargo test --lib --verbose
