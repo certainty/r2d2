@@ -44,7 +44,7 @@ pub struct LSM {
 }
 
 pub fn init(base_directory: &Path) -> Result<LSM> {
-    let mut wal = wal::init(base_directory)?;
+    let wal = wal::init(base_directory)?;
 
     let lsm = if wal.recovery_needed() {
         init_with_recovery(&wal)
@@ -52,14 +52,14 @@ pub fn init(base_directory: &Path) -> Result<LSM> {
         init_clean(&wal)
     };
 
-    info!("lsm subsystem initialized and ready");
+    info!(target: "LSM","lsm subsystem initialized and ready");
     lsm
 }
 
 fn init_clean(wal: &wal::Wal) -> Result<LSM> {
-    let mut memtable = SkipMap::new();
+    let memtable = SkipMap::new();
 
-    info!("starting lsm with fresh commit log",);
+    info!(target: "LSM", "starting lsm with fresh commit log",);
 
     Ok(LSM {
         wal: wal.create()?,
@@ -70,14 +70,14 @@ fn init_clean(wal: &wal::Wal) -> Result<LSM> {
 fn init_with_recovery(wal: &wal::Wal) -> Result<LSM> {
     info!(target: "LSM", "starting recovery from WAL");
 
-    let mut memtable = SkipMap::new();
+    let memtable = SkipMap::new();
     let mut lsm_for_repair = LSM {
         wal: wal.null()?,
         memtable,
     };
 
     recover(&mut lsm_for_repair, &wal)?;
-    info!("state is restored successfully");
+    info!(target: "LSM", "recovery completed successfully");
 
     Ok(LSM {
         wal: wal.resume()?,
@@ -86,7 +86,7 @@ fn init_with_recovery(wal: &wal::Wal) -> Result<LSM> {
 }
 
 fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
-    let mut reader = wal.open()?;
+    let reader = wal.open()?;
 
     for result_of_op in reader {
         match result_of_op? {
