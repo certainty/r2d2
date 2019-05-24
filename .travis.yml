@@ -2,3 +2,6 @@ language: rust
 rust:
   - stable
 cache: cargo
+script:
+  - cargo build --verbose
+  - cargo test --lib --verbose
