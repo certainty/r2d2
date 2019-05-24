@@ -18,6 +18,8 @@ use std::sync::{Arc, Mutex};
 use serde;
 use serde::{Deserialize, Serialize};
 
+use super::binary_io as binio;
+use crate::engine::storage::lsm::wal::Error::BinIoError;
 use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
@@ -71,9 +73,15 @@ impl Wal {
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    SerializationError,
     IoError(io::ErrorKind),
+    BinIoError(binio::Error),
     LockError,
+}
+
+impl From<binio::Error> for Error {
+    fn from(e: binio::Error) -> Self {
+        BinIoError(e)
+    }
 }
 
 impl From<io::Error> for Error {
@@ -141,7 +149,7 @@ impl WalWriter {
         let mut writer = fs::OpenOptions::new().create(true).write(true).open(path)?;
         let header = FileHeader::new(STANZA, VERSION);
 
-        write_data(&mut writer, header)?;
+        binio::write_data(&mut writer, header)?;
 
         Ok(WalWriter {
             file: Arc::new(Mutex::new(BufWriter::new(writer))),
@@ -150,7 +158,9 @@ impl WalWriter {
 
     pub fn write(&mut self, op: Operation<&[u8]>) -> Result<usize> {
         let mut file = self.file.lock()?;
-        write_data(&mut *file, op)
+        let size = binio::write_data(&mut *file, op)?;
+
+        Ok(size)
     }
 }
 
@@ -162,7 +172,7 @@ pub struct WalReader {
 impl WalReader {
     pub fn open(path: &path::Path) -> Result<WalReader> {
         let mut reader = fs::OpenOptions::new().read(true).open(path)?;
-        let header: FileHeader = read_data(&mut reader)?;
+        let header: FileHeader = binio::read_data(&mut reader)?;
 
         trace!(
             target: "WAL",
@@ -177,7 +187,8 @@ impl WalReader {
     }
 
     pub fn read(&mut self) -> Result<Operation<Vec<u8>>> {
-        read_data(&mut self.file)
+        let data = binio::read_data(&mut self.file)?;
+        Ok(data)
     }
 }
 
@@ -186,60 +197,11 @@ impl Iterator for WalReader {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.read() {
-            Err(Error::IoError(io::ErrorKind::UnexpectedEof)) => None,
+            Err(Error::BinIoError(binio::Error::IoError(io::ErrorKind::UnexpectedEof))) => None,
             Err(e) => Some(Err(e)),
             ok => Some(ok),
         }
     }
-}
-
-// utilities
-fn write_data<W, D>(w: &mut W, data: D) -> Result<usize>
-where
-    W: io::Write,
-    D: serde::Serialize,
-{
-    let serialized = bincode::serialize(&data).map_err(|e| {
-        error!(target: "WAL", "serialization of data frame failed: {:?}", e.as_ref());
-        Error::SerializationError
-    })?;
-
-    write_frame(w, &serialized)
-}
-
-// TODO: make sure we really need the owned variant here
-// could be a problem since data may be copied
-fn read_data<R, D>(r: &mut R) -> Result<D>
-where
-    R: io::Read,
-    D: serde::de::DeserializeOwned,
-{
-    let mut buf = Vec::new();
-    read_frame(r, &mut buf)?;
-    let value = bincode::deserialize(buf.as_slice()).map_err(|e| {
-        error!(target: "WAL", "deserialization of data frame failed: {:?}", e.as_ref());
-        Error::SerializationError
-    })?;
-    Ok(value)
-}
-
-fn read_frame<R>(reader: &mut R, buf: &mut Vec<u8>) -> Result<usize>
-where
-    R: io::Read,
-{
-    let size = reader.read_u64::<LittleEndian>()?;
-    reader.take(size).read_to_end(buf)?;
-    Ok(size as usize)
-}
-
-fn write_frame<W>(writer: &mut W, data: &[u8]) -> Result<usize>
-where
-    W: io::Write,
-{
-    writer.write_u64::<LittleEndian>(data.len() as u64)?;
-    writer.write_all(data)?;
-    writer.flush()?;
-    Ok(data.len())
 }
 
 mod tests {
@@ -251,11 +213,11 @@ mod tests {
         let foo = "foo".as_bytes();
         let bar = "bar".as_bytes();
 
-        assert!(write_data(&mut writer, Operation::Set(foo, bar)).is_ok());
+        assert!(binio::write_data(&mut writer, Operation::Set(foo, bar)).is_ok());
 
         let mut reader = io::Cursor::new(writer.into_inner());
 
-        let op: Operation<Vec<u8>> = read_data(&mut reader).unwrap();
+        let op: Operation<Vec<u8>> = binio::read_data(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
     }

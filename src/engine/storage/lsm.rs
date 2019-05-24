@@ -8,6 +8,8 @@
 //! related to the management of the local LSM. It might spawn additional
 //! threads.
 
+mod binary_io;
+pub mod sstable;
 pub mod wal;
 
 use log::{info, trace};
@@ -19,13 +21,13 @@ type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    CommitLogError(wal::Error),
+    WalError(wal::Error),
     IoError(std::io::ErrorKind),
 }
 
 impl From<wal::Error> for Error {
     fn from(e: wal::Error) -> Self {
-        Error::CommitLogError(e)
+        Error::WalError(e)
     }
 }
 
