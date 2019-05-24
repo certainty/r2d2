@@ -13,7 +13,7 @@ pub mod commit_log;
 
 use log::{info, trace};
 use skiplist::SkipMap;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::result;
 
 type Result<T> = result::Result<T, Error>;
@@ -21,11 +21,18 @@ type Result<T> = result::Result<T, Error>;
 #[derive(Debug, PartialEq)]
 pub enum Error {
     CommitLogError(commit_log::Error),
+    IoError(std::io::ErrorKind),
 }
 
 impl From<commit_log::Error> for Error {
     fn from(e: commit_log::Error) -> Self {
         Error::CommitLogError(e)
+    }
+}
+
+impl From<std::io::Error> for Error {
+    fn from(e: std::io::Error) -> Self {
+        Error::IoError(e.kind())
     }
 }
 
@@ -38,20 +45,32 @@ pub struct LSM {
 
 const COMMIT_LOG_NAME: &str = "commit.log";
 
-pub fn init(storage_directory: &Path) -> Result<LSM> {
-    let commit_log_path = storage_directory.join(COMMIT_LOG_NAME);
+pub fn init(base_directory: &Path) -> Result<LSM> {
+    let commit_log_directory = init_directory(base_directory)?;
 
-    let lsm = if commit_log_path.exists() {
-        init_with_recovery(commit_log_path.as_path())
+    let lsm = if recovery_required(&commit_log_directory) {
+        init_with_recovery(&commit_log_directory)
     } else {
-        init_clean(commit_log_path.as_path())
+        init_clean(&commit_log_directory)
     };
 
     info!("lsm subsystem initialized and ready");
     lsm
 }
 
-fn init_clean(commit_log_path: &Path) -> Result<LSM> {
+fn recovery_required(commit_log_directory: &Path) -> bool {
+    let commit_log_path = commit_log_directory.join(COMMIT_LOG_NAME);
+    commit_log_path.exists()
+}
+
+fn init_directory(storage_path: &Path) -> Result<PathBuf> {
+    let commit_log_path = storage_path.join("commit_log");
+    std::fs::create_dir_all(&commit_log_path)?;
+    Ok(commit_log_path)
+}
+
+fn init_clean(commit_log_directory: &Path) -> Result<LSM> {
+    let commit_log_path = commit_log_directory.join(COMMIT_LOG_NAME);
     let mut memtable = SkipMap::new();
 
     info!(
@@ -60,12 +79,13 @@ fn init_clean(commit_log_path: &Path) -> Result<LSM> {
     );
 
     Ok(LSM {
-        commit_log: commit_log::create(commit_log_path)?,
+        commit_log: commit_log::create(&commit_log_path)?,
         memtable,
     })
 }
 
-fn init_with_recovery(commit_log_path: &Path) -> Result<LSM> {
+fn init_with_recovery(commit_log_directory: &Path) -> Result<LSM> {
+    let commit_log_path = commit_log_directory.join(COMMIT_LOG_NAME);
     let mut memtable = SkipMap::new();
 
     info!("commit log exists, will try to repair");
@@ -74,11 +94,11 @@ fn init_with_recovery(commit_log_path: &Path) -> Result<LSM> {
         memtable,
     };
 
-    recover(&mut lsm_for_repair, commit_log_path)?;
+    recover(&mut lsm_for_repair, &commit_log_path)?;
     info!("state is restored successfully");
 
     Ok(LSM {
-        commit_log: commit_log::resume(commit_log_path)?,
+        commit_log: commit_log::resume(&commit_log_path)?,
         ..lsm_for_repair
     })
 }
