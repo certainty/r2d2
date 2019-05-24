@@ -8,7 +8,7 @@ use utils::*;
 use wal::Operation;
 
 #[test]
-fn check_commit_log_works() {
+fn check_wal_works() {
     setup();
     let wal = wal::init(Path::new(TEST_STORAGE_DIRECTORY)).unwrap();
     let mut log_writer = wal.create().unwrap();
@@ -32,11 +32,10 @@ fn check_commit_log_works() {
 }
 
 #[test]
-fn check_commit_log_iterator() {
+fn check_wal_iterator() {
     setup();
     let wal = wal::init(Path::new(TEST_STORAGE_DIRECTORY)).unwrap();
     let mut log_writer = wal.create().unwrap();
-    let mut log_reader = wal.open().unwrap();
     let foo = str_vec("foo");
     let bar = str_vec("bar");
     let baz = str_vec("baz");
@@ -45,6 +44,7 @@ fn check_commit_log_iterator() {
     assert!(log_writer.write(Operation::Set(&bar, &baz)).is_ok());
     assert!(log_writer.write(Operation::Delete(&bar)).is_ok());
 
+    let mut log_reader = wal.open().unwrap();
     let op1 = log_reader.next().unwrap().unwrap();
     assert_eq!(wal::Operation::Set(foo.clone(), bar.clone()), op1);
 

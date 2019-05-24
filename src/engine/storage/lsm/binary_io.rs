@@ -19,6 +19,22 @@ impl From<io::Error> for Error {
     }
 }
 
+pub fn read_u64<R>(r: &mut R) -> Result<u64>
+where
+    R: io::Read,
+{
+    r.read_u64::<LittleEndian>()
+        .map_err(|e| Error::IoError(e.kind()))
+}
+
+pub fn write_u64<W>(w: &mut W, d: u64) -> Result<usize>
+where
+    W: io::Write,
+{
+    w.write_u64::<LittleEndian>(d)?;
+    Ok(8)
+}
+
 pub fn write_data<W, D>(w: &mut W, data: D) -> Result<usize>
 where
     W: io::Write,
@@ -32,8 +48,6 @@ where
     write_frame(w, &serialized)
 }
 
-// TODO: make sure we really need the owned variant here
-// could be a problem since data may be copied
 pub fn read_data<R, D>(r: &mut R) -> Result<D>
 where
     R: io::Read,
@@ -61,8 +75,7 @@ pub fn write_frame<W>(writer: &mut W, data: &[u8]) -> Result<usize>
 where
     W: io::Write,
 {
-    writer.write_u64::<LittleEndian>(data.len() as u64)?;
+    write_u64(writer, data.len() as u64)?;
     writer.write_all(data)?;
-    writer.flush()?;
-    Ok(data.len())
+    Ok(data.len() + 8)
 }

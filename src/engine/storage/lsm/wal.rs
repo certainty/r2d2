@@ -23,7 +23,7 @@ use crate::engine::storage::lsm::wal::Error::BinIoError;
 use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
-use std::io::{BufReader, BufWriter, Read};
+use std::io::{BufReader, BufWriter, Write};
 use std::path::PathBuf;
 
 const VERSION: u8 = 1;
@@ -159,6 +159,7 @@ impl WalWriter {
     pub fn write(&mut self, op: Operation<&[u8]>) -> Result<usize> {
         let mut file = self.file.lock()?;
         let size = binio::write_data(&mut *file, op)?;
+        file.flush()?;
 
         Ok(size)
     }
