@@ -1,8 +1,8 @@
-//! Simple append only commit log
+//! Simple append only write ahead log
 //!
-//! This module provides the funcitonality for a simple append only commit-log.
+//! This module provides the funcitonality for a simple append only wal.
 //! Every write is first written to this log before any further action is taken.
-//! In case of a crash the commitlog can be used to reconstruct the state prior to the
+//! In case of a crash the wal can be used to reconstruct the state prior to the
 //! crash.
 //! Note that the log writes to the filesystem without flushing, thus leaving
 //! the ultimate control over when the write happens to the OS at the benefit of a faster
@@ -22,27 +22,28 @@ use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
 use std::io::{BufReader, BufWriter, Read};
+use std::path::PathBuf;
 
 const VERSION: u8 = 1;
-const STANZA: &str = "r2d2::commitlog";
+const STANZA: &str = "r2d2::wal";
 
 type Result<T> = std::result::Result<T, Error>;
 
 // public API
-pub fn open(path: &path::Path) -> Result<CommitLogReader> {
-    CommitLogReader::open(path)
+pub fn open(path: &path::Path) -> Result<WalReader> {
+    WalReader::open(path)
 }
 
-pub fn create(path: &path::Path) -> Result<CommitLogWriter> {
-    CommitLogWriter::create(path)
+pub fn create(path: &path::Path) -> Result<WalWriter> {
+    WalWriter::create(path)
 }
 
-pub fn resume(path: &path::Path) -> Result<CommitLogWriter> {
-    CommitLogWriter::resume(path)
+pub fn resume(path: &path::Path) -> Result<WalWriter> {
+    WalWriter::resume(path)
 }
 
-pub fn null() -> Result<CommitLogWriter> {
-    CommitLogWriter::null()
+pub fn null() -> Result<WalWriter> {
+    WalWriter::null()
 }
 
 #[derive(Debug, PartialEq)]
@@ -85,41 +86,41 @@ pub enum Operation<T> {
     Delete(T),
 }
 
-pub struct CommitLogWriter {
+pub struct WalWriter {
     file: Arc<Mutex<io::BufWriter<fs::File>>>,
 }
 
-impl CommitLogWriter {
-    pub fn resume(path: &path::Path) -> Result<CommitLogWriter> {
+impl WalWriter {
+    pub fn resume(path: &path::Path) -> Result<WalWriter> {
         let writer = fs::OpenOptions::new()
             .create(true)
             .append(true)
             .write(true)
             .open(path)?;
 
-        Ok(CommitLogWriter {
+        Ok(WalWriter {
             file: Arc::new(Mutex::new(BufWriter::new(writer))),
         })
     }
 
-    pub fn null() -> Result<CommitLogWriter> {
+    pub fn null() -> Result<WalWriter> {
         let writer = fs::OpenOptions::new()
             .append(true)
             .write(true)
             .open(path::Path::new("/dev/null"))?;
 
-        Ok(CommitLogWriter {
+        Ok(WalWriter {
             file: Arc::new(Mutex::new(BufWriter::new(writer))),
         })
     }
 
-    pub fn create(path: &path::Path) -> Result<CommitLogWriter> {
+    pub fn create(path: &path::Path) -> Result<WalWriter> {
         let mut writer = fs::OpenOptions::new().create(true).write(true).open(path)?;
         let header = FileHeader::new(STANZA, VERSION);
 
         write_data(&mut writer, header)?;
 
-        Ok(CommitLogWriter {
+        Ok(WalWriter {
             file: Arc::new(Mutex::new(BufWriter::new(writer))),
         })
     }
@@ -130,22 +131,23 @@ impl CommitLogWriter {
     }
 }
 
-pub struct CommitLogReader {
+pub struct WalReader {
     header: FileHeader,
     file: io::BufReader<fs::File>,
 }
 
-impl CommitLogReader {
-    pub fn open(path: &path::Path) -> Result<CommitLogReader> {
+impl WalReader {
+    pub fn open(path: &path::Path) -> Result<WalReader> {
         let mut reader = fs::OpenOptions::new().read(true).open(path)?;
         let header: FileHeader = read_data(&mut reader)?;
 
         trace!(
-            "commit log successfullt opened. version = {}",
+            target: "WAL",
+            "wal successfully opened. version = {}",
             header.version
         );
 
-        Ok(CommitLogReader {
+        Ok(WalReader {
             header,
             file: BufReader::new(reader),
         })
@@ -156,7 +158,7 @@ impl CommitLogReader {
     }
 }
 
-impl Iterator for CommitLogReader {
+impl Iterator for WalReader {
     type Item = Result<Operation<Vec<u8>>>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -175,7 +177,7 @@ where
     D: serde::Serialize,
 {
     let serialized = bincode::serialize(&data).map_err(|e| {
-        error!("serialization of data frame failed: {:?}", e.as_ref());
+        error!(target: "WAL", "serialization of data frame failed: {:?}", e.as_ref());
         Error::SerializationError
     })?;
 
@@ -192,7 +194,7 @@ where
     let mut buf = Vec::new();
     read_frame(r, &mut buf)?;
     let value = bincode::deserialize(buf.as_slice()).map_err(|e| {
-        error!("deserialization of data frame failed: {:?}", e.as_ref());
+        error!(target: "WAL", "deserialization of data frame failed: {:?}", e.as_ref());
         Error::SerializationError
     })?;
     Ok(value)

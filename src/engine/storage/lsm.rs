@@ -9,7 +9,7 @@
 //! threads.
 
 extern crate skiplist;
-pub mod commit_log;
+pub mod wal;
 
 use log::{info, trace};
 use skiplist::SkipMap;
@@ -20,12 +20,12 @@ type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    CommitLogError(commit_log::Error),
+    CommitLogError(wal::Error),
     IoError(std::io::ErrorKind),
 }
 
-impl From<commit_log::Error> for Error {
-    fn from(e: commit_log::Error) -> Self {
+impl From<wal::Error> for Error {
+    fn from(e: wal::Error) -> Self {
         Error::CommitLogError(e)
     }
 }
@@ -39,11 +39,11 @@ impl From<std::io::Error> for Error {
 type Memtable = SkipMap<Vec<u8>, Vec<u8>>;
 
 pub struct LSM {
-    commit_log: commit_log::CommitLogWriter,
+    commit_log: wal::WalWriter,
     memtable: Memtable,
 }
 
-const COMMIT_LOG_NAME: &str = "commit.log";
+const COMMIT_LOG_NAME: &str = "write_ahead.log";
 
 pub fn init(base_directory: &Path) -> Result<LSM> {
     let commit_log_directory = init_directory(base_directory)?;
@@ -79,7 +79,7 @@ fn init_clean(commit_log_directory: &Path) -> Result<LSM> {
     );
 
     Ok(LSM {
-        commit_log: commit_log::create(&commit_log_path)?,
+        commit_log: wal::create(&commit_log_path)?,
         memtable,
     })
 }
@@ -90,7 +90,7 @@ fn init_with_recovery(commit_log_directory: &Path) -> Result<LSM> {
 
     info!("commit log exists, will try to repair");
     let mut lsm_for_repair = LSM {
-        commit_log: commit_log::null()?,
+        commit_log: wal::null()?,
         memtable,
     };
 
@@ -98,7 +98,7 @@ fn init_with_recovery(commit_log_directory: &Path) -> Result<LSM> {
     info!("state is restored successfully");
 
     Ok(LSM {
-        commit_log: commit_log::resume(&commit_log_path)?,
+        commit_log: wal::resume(&commit_log_path)?,
         ..lsm_for_repair
     })
 }
@@ -109,15 +109,15 @@ fn recover(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
         commit_log_path
     );
 
-    let mut reader = commit_log::open(commit_log_path)?;
+    let mut reader = wal::open(commit_log_path)?;
 
     for result_of_op in reader {
         match result_of_op? {
-            commit_log::Operation::Set(key, value) => {
+            wal::Operation::Set(key, value) => {
                 lsm.set(key, value)?;
                 ()
             }
-            commit_log::Operation::Delete(key) => {
+            wal::Operation::Delete(key) => {
                 lsm.del(key)?;
                 ()
             }
@@ -129,12 +129,12 @@ fn recover(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
 
 impl LSM {
     pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.commit_log.write(commit_log::Operation::Set(&k, &v))?;
+        self.commit_log.write(wal::Operation::Set(&k, &v))?;
         Ok(self.memtable.insert(k, v))
     }
 
     pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.commit_log.write(commit_log::Operation::Delete(&k))?;
+        self.commit_log.write(wal::Operation::Delete(&k))?;
         Ok(self.memtable.remove(&k))
     }
 
