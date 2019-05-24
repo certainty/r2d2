@@ -38,39 +38,52 @@ pub struct LSM {
 
 const COMMIT_LOG_NAME: &str = "commit.log";
 
-pub fn new(storage_directory: &Path) -> Result<LSM> {
-    let mut memtable = SkipMap::new();
+pub fn init(storage_directory: &Path) -> Result<LSM> {
     let commit_log_path = storage_directory.join(COMMIT_LOG_NAME);
 
-    if commit_log_path.exists() {
-        info!("commit log exists, will try to repair");
-
-        let mut lsm = LSM {
-            commit_log: commit_log::null()?,
-            memtable,
-        };
-
-        repair(&mut lsm, commit_log_path.as_path())?;
-        info!("state is restored successfully");
-
-        Ok(LSM {
-            commit_log: commit_log::resume(commit_log_path.as_path())?,
-            ..lsm
-        })
+    let lsm = if commit_log_path.exists() {
+        init_with_recovery(commit_log_path.as_path())
     } else {
-        info!(
-            "starting lsm with fresh commit log at {:?}",
-            commit_log_path
-        );
+        init_clean(commit_log_path.as_path())
+    };
 
-        Ok(LSM {
-            commit_log: commit_log::create(commit_log_path.as_path())?,
-            memtable,
-        })
-    }
+    info!("lsm subsystem initialized and ready");
+    lsm
 }
 
-fn repair(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
+fn init_clean(commit_log_path: &Path) -> Result<LSM> {
+    let mut memtable = SkipMap::new();
+
+    info!(
+        "starting lsm with fresh commit log at {:?}",
+        commit_log_path
+    );
+
+    Ok(LSM {
+        commit_log: commit_log::create(commit_log_path)?,
+        memtable,
+    })
+}
+
+fn init_with_recovery(commit_log_path: &Path) -> Result<LSM> {
+    let mut memtable = SkipMap::new();
+
+    info!("commit log exists, will try to repair");
+    let mut lsm_for_repair = LSM {
+        commit_log: commit_log::null()?,
+        memtable,
+    };
+
+    recover(&mut lsm_for_repair, commit_log_path)?;
+    info!("state is restored successfully");
+
+    Ok(LSM {
+        commit_log: commit_log::resume(commit_log_path)?,
+        ..lsm_for_repair
+    })
+}
+
+fn recover(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
     info!(
         "repairing local state from commit log at: {:?}",
         commit_log_path
@@ -95,10 +108,9 @@ fn repair(lsm: &mut LSM, commit_log_path: &Path) -> Result<()> {
 }
 
 impl LSM {
-    pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<()> {
+    pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<Option<Vec<u8>>> {
         self.commit_log.write(commit_log::Operation::Set(&k, &v))?;
-        self.memtable.insert(k, v);
-        Ok(())
+        Ok(self.memtable.insert(k, v))
     }
 
     pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {

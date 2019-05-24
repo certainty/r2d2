@@ -1,3 +1,4 @@
+#[allow(unused_must_use)]
 use std::fs;
 
 pub static TEST_DIRECTORY: &str = "tmp/r2d2";

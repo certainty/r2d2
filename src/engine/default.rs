@@ -25,9 +25,7 @@ pub struct DefaultEngine {
 
 pub fn new(storage_directory: PathBuf) -> DefaultEngine {
     let storage_path = fs::canonicalize(&storage_directory).unwrap();
-    let lsm = lsm::new(storage_path.as_path()).unwrap();
-
-    info!("lsm subsystem initialized and ready");
+    let lsm = lsm::init(storage_path.as_path()).unwrap();
 
     DefaultEngine { lsm }
 }
@@ -35,23 +33,27 @@ pub fn new(storage_directory: PathBuf) -> DefaultEngine {
 impl Engine for DefaultEngine {
     fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
-        self.lsm.set(key.data, value.data)?;
-        Ok(None)
+
+        let previous = self.lsm.set(key.data, value.data)?;
+        Ok(previous.map(|i| Value::new(i)))
     }
 
     fn del(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Delete {:?}", key);
-        let value = self.lsm.del(key.data)?;
-        Ok(value.map(|v| Value::new(v)))
+
+        let previous = self.lsm.del(key.data)?;
+        Ok(previous.map(|v| Value::new(v)))
     }
 
     fn get(&self, key: Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Lookup {:?}", key);
-        let value = self.lsm.get(key.data)?;
 
+        let value = self.lsm.get(key.data)?;
+        // TODO: do we really want to copy here?
         Ok(value.map(|v| Value::new(v.clone())))
     }
 
+    // TODO: maybe we should implement an iterator instead to make it more efficient
     fn keys(&self) -> Result<Vec<Key>, EngineError> {
         trace!(target: "engine", "List keys");
         let byte_keys = self.lsm.keys()?;
