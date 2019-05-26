@@ -21,6 +21,7 @@ const STANZA: &str = "r2d2::sstable";
 pub enum Error {
     IoError(io::ErrorKind),
     BinIoError(binio::Error),
+    EmptyTable,
 }
 
 impl From<io::Error> for Error {
@@ -36,7 +37,7 @@ impl From<binio::Error> for Error {
 }
 
 #[derive(Debug)]
-struct Slab {
+pub struct Slab {
     level: Level,
     max_key: Key,
     min_key: Key,
@@ -79,18 +80,18 @@ impl SSTable {
 // TRAILER
 
 #[derive(Serialize, Deserialize, Debug)]
-struct Trailer<'a> {
+struct Trailer {
     start_of_meta_block: Offset,
     version: u8,
-    stanza: &'a [u8],
+    stanza: Vec<u8>,
 }
 
-impl<'a> Trailer<'a> {
-    fn new(start_of_meta_block: Offset) -> Trailer<'a> {
+impl Trailer {
+    fn new(start_of_meta_block: Offset) -> Trailer {
         Trailer {
             start_of_meta_block,
             version: 0x1,
-            stanza: &STANZA.as_bytes(),
+            stanza: STANZA.as_bytes().to_vec(),
         }
     }
 }
@@ -106,7 +107,8 @@ pub struct Writer {
     file: io::BufWriter<fs::File>,
     data_bytes_written: usize,
     data_count: usize,
-    table: SSTable,
+    index: Vec<(Key, usize)>,
+    path: path::PathBuf,
 }
 
 impl Writer {
@@ -117,7 +119,8 @@ impl Writer {
             file,
             data_bytes_written: 0,
             data_count: 0,
-            table: SSTable::new(path),
+            index: Vec::new(),
+            path: path.to_owned(),
         })
     }
 
@@ -128,23 +131,23 @@ impl Writer {
         self.data_bytes_written += binio::write_frame(&mut self.file, &k)?;
         self.data_bytes_written += binio::write_frame(&mut self.file, &v)?;
         self.data_count += 1;
+        self.index.push((k, pos));
 
-        self.table.index.insert(k, pos);
         Ok(())
     }
 
-    pub fn finish(mut self) -> Result<SSTable> {
+    pub fn finish(mut self) -> Result<Slab> {
         let end_of_data = self.data_bytes_written;
         let meta = Meta {
             data_block_count: self.data_count,
             data_size: end_of_data,
-            index_size: self.table.index.len(),
+            index_size: self.index.len(),
         };
 
         println!("writing meta data: {:?}", meta);
 
         let index_offset = end_of_data + binio::write_data(&mut self.file, &meta)?;
-        let trailer_offset = index_offset + binio::write_data(&mut self.file, &self.table.index)?;
+        let trailer_offset = index_offset + binio::write_data(&mut self.file, &self.index)?;
         let trailer = Trailer::new(end_of_data);
 
         binio::write_data(&mut self.file, &trailer)?;
@@ -152,8 +155,17 @@ impl Writer {
         self.file.flush()?;
 
         println!("meta data written");
+        if (self.index.is_empty()) {
+            return Err(Error::EmptyTable);
+        }
 
-        Ok(self.table)
+        Ok(Slab {
+            // TODO: add actual level
+            level: 0,
+            path: self.path,
+            min_key: self.index[0].0.clone(),
+            max_key: self.index.last().unwrap().0.clone(),
+        })
     }
 }
 
@@ -178,11 +190,10 @@ impl Reader {
         let trailer_offset = binio::read_u64(file)?;
 
         file.seek(SeekFrom::Start(trailer_offset))?;
-        let trailer: Trailer = binio::read_data(file)?;
+        let trailer: Trailer = binio::read_data_owned(file)?;
 
         file.seek(SeekFrom::Start(trailer.start_of_meta_block as u64))?;
-        let meta: Meta = binio::read_data(file)?;
-
+        let meta: Meta = binio::read_data_owned(file)?;
         Ok(meta)
     }
 }

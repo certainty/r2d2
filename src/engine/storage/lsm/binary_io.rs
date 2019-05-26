@@ -48,7 +48,7 @@ where
     write_frame(w, &serialized)
 }
 
-pub fn read_data<R, D>(r: &mut R) -> Result<D>
+pub fn read_data_owned<R, D>(r: &mut R) -> Result<D>
 where
     R: io::Read,
     D: serde::de::DeserializeOwned,

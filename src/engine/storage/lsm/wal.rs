@@ -173,7 +173,7 @@ pub struct WalReader {
 impl WalReader {
     pub fn open(path: &path::Path) -> Result<WalReader> {
         let mut reader = fs::OpenOptions::new().read(true).open(path)?;
-        let header: FileHeader = binio::read_data(&mut reader)?;
+        let header: FileHeader = binio::read_data_owned(&mut reader)?;
 
         trace!(
             target: "WAL",
@@ -188,7 +188,7 @@ impl WalReader {
     }
 
     pub fn read(&mut self) -> Result<Operation<Vec<u8>>> {
-        let data = binio::read_data(&mut self.file)?;
+        let data = binio::read_data_owned(&mut self.file)?;
         Ok(data)
     }
 }
@@ -218,7 +218,7 @@ mod tests {
 
         let mut reader = io::Cursor::new(writer.into_inner());
 
-        let op: Operation<Vec<u8>> = binio::read_data(&mut reader).unwrap();
+        let op: Operation<Vec<u8>> = binio::read_data_owned(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
     }
