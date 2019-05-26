@@ -17,7 +17,9 @@ fn check_write_sstable() {
     assert!(writer.add_data(str_vec("bar"), str_vec("baz")).is_ok());
     assert!(writer.add_data(str_vec("baz"), str_vec("frooble")).is_ok());
 
-    let sstable = writer.finish().unwrap();
+    let slab = writer.finish().unwrap();
+    println!("SSTABLE written");
+    let sstable = sstable::SSTable::open(&slab.path).unwrap();
 
-    //assert!(sstable.get(&str_vec("foo")).unwrap().is_some());
+    assert_eq!(Some(&str_vec("bar")), sstable.get(&str_vec("foo")).unwrap())
 }
