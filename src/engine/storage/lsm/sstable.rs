@@ -53,9 +53,14 @@ pub struct SSTable {
 }
 
 impl SSTable {
-    pub fn get(&self, k: &Key) -> Result<Option<&Value>> {
-        let offset = self.index.get(k);
-        Ok(None)
+    pub fn get(&mut self, k: &Key) -> Result<Option<Value>> {
+        match self.index.get(k) {
+            Some(offset) => {
+                let record = self.reader.read_record(*offset)?;
+                Ok(Some(record))
+            }
+            None => Ok(None),
+        }
     }
 
     pub fn open(path: &path::Path) -> Result<SSTable> {
