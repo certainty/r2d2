@@ -1,5 +1,30 @@
+//! SSTable module provides functionality to manage SSTables on disk and in memory
+//!
+//! A SSTable (sorted strings table) is an immutable on disk representation
+//! of key-value pairs. In the LSM architecture SSTables are created as a result
+//! of flushing the current in-memory table to disk.
+//!
+//! SSTables maintain and index which is used to access data on disk faster.
+//! Once an SSTable has been written it is immutable and must not be changed anymore.
+//!
+//! This module also provides functioniolatity run compaction on the SSTables and thus
+//! merge intermediate tables together.
+//!
+//! ## Examples:
+//!     
+//!     use r2d2::engine::storage::lsm::sstable;
+//!     let table_writer = sstable::Writer::create("path/to/sstable").unwrap();
+//!     
+//!     table_writer.append("foo", "bar").unwrap();
+//!     table_writer.append("foobar", "baz").unwrap();
+//!     table_writer.seal();
+//!
+//!     /// No more writes are allowed
+//!
+//!
+//!
 use super::binary_io as binio;
-use log::trace;
+use log::{info, trace};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -46,7 +71,7 @@ pub struct Slab {
 }
 
 pub struct SSTable {
-    // TODO: think about using a trie instead?
+    // TODO: a trie could be a better choice memory-wise?
     index: HashMap<Key, Offset>,
     path: path::PathBuf,
     reader: Reader,
@@ -56,10 +81,14 @@ impl SSTable {
     pub fn get(&mut self, k: &Key) -> Result<Option<Value>> {
         match self.index.get(k) {
             Some(offset) => {
+                trace!("found key {:?} at offset: {}", k, offset);
                 let record = self.reader.read_record(*offset)?;
                 Ok(Some(record))
             }
-            None => Ok(None),
+            None => {
+                trace!("ket {:?} not found", k);
+                Ok(None)
+            }
         }
     }
 
@@ -136,17 +165,23 @@ impl Writer {
         })
     }
 
-    pub fn add_data(&mut self, k: Key, v: Value) -> Result<()> {
-        let pos = self.data_bytes_written;
-        self.data_bytes_written += binio::write_frame(&mut self.file, &k)?;
-        self.data_bytes_written += binio::write_frame(&mut self.file, &v)?;
-        self.index.push((k, pos));
+    pub fn append(&mut self, k: Key, v: Value) -> Result<()> {
+        trace!("append key {:?} offset: {}", k, self.data_bytes_written);
+
+        self.data_bytes_written += binio::write_data(&mut self.file, &k)?;
+        self.index.push((k, self.data_bytes_written));
+
+        trace!("append value offset: {}", self.data_bytes_written);
+
+        self.data_bytes_written += binio::write_data(&mut self.file, &v)?;
         self.data_count += 1;
+
+        trace!("append finished offset: {}", self.data_bytes_written);
 
         Ok(())
     }
 
-    pub fn finish(&mut self) -> Result<Slab> {
+    pub fn seal(&mut self) -> Result<Slab> {
         if self.sealed {
             return Err(Error::SealedTableError);
         }
@@ -161,7 +196,7 @@ impl Writer {
         let (min_key, _) = idx.first().unwrap();
         let (max_key, _) = idx.last().unwrap();
 
-        trace!(target: "SSTable::Writer", "sstable finished and sealed {:#?}", self.path);
+        info!("sstable finished and sealed {:?}", self.path);
 
         Ok(Slab {
             level: 0,
@@ -179,7 +214,7 @@ impl Writer {
             index_size: self.index.len(),
         };
 
-        trace!(target: "SSTable::Writer", "writing meta data: {:?} at offset: {}", meta, meta_offset);
+        trace!("writing meta data: {:?} offset: {}", meta, meta_offset);
 
         binio::write_data(&mut self.file, &meta)?;
         Ok(meta_offset)
@@ -189,10 +224,10 @@ impl Writer {
         let trailer_offset = self.pos()?;
         let trailer = Trailer::new(meta_offset, index_offset);
 
-        trace!(target: "SSTable::Writer", "writing trailer: {:?} at offset: {}", trailer, trailer_offset);
+        trace!("writing trailer: {:?} offset: {}", trailer, trailer_offset);
 
         binio::write_data(&mut self.file, &trailer)?;
-        binio::write_u64(&mut self.file, trailer_offset as u64)?;
+        binio::write_data_size(&mut self.file, trailer_offset)?;
 
         Ok(trailer_offset)
     }
@@ -200,7 +235,11 @@ impl Writer {
     fn write_index(&mut self) -> Result<Offset> {
         let index_offset = self.pos()?;
 
-        trace!(target: "SSTable::Writer", "writing index of size {} at offset: {}", &self.index.len(), index_offset);
+        trace!(
+            "writing index of size {} offset: {}",
+            &self.index.len(),
+            index_offset
+        );
 
         for (key, offset) in &self.index {
             binio::write_data(&mut self.file, key)?;
@@ -259,16 +298,16 @@ impl Reader {
     }
 
     fn read_control_data(file: &mut ReaderStorage) -> Result<(Meta, Trailer)> {
-        file.seek(SeekFrom::End(-8))?;
-        let trailer_offset = binio::read_u64(file)?;
+        file.seek(SeekFrom::End((binio::LENGTH_TAG_SIZE * -1) as i64))?;
+        let trailer_offset = binio::read_data_size(file)?;
         file.seek(SeekFrom::Start(trailer_offset as u64))?;
 
         let trailer: Trailer = binio::read_data_owned(file)?;
-        trace!(target: "SSTable::Reader", "read trailer {:#?} at: {}", trailer,  trailer_offset);
+        trace!("read trailer {:?} offset: {}", trailer, trailer_offset);
 
         file.seek(SeekFrom::Start(trailer.meta_offset as u64))?;
         let meta: Meta = binio::read_data_owned(file)?;
-        trace!(target: "SSTable::Reader", "read meta {:#?} at: {}", meta, trailer.meta_offset);
+        trace!("read meta {:?} offset: {}", meta, trailer.meta_offset);
 
         Ok((meta, trailer))
     }
