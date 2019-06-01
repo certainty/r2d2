@@ -7,21 +7,18 @@
 //! SSTables maintain and index which is used to access data on disk faster.
 //! Once an SSTable has been written it is immutable and must not be changed anymore.
 //!
-//! This module also provides functioniolatity run compaction on the SSTables and thus
+//! This module also provides functionality to run compaction on the SSTables and thus
 //! merge intermediate tables together.
 //!
-//!
+use super::binary_io as binio;
+use log::{info, trace};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
 use std::io::{Seek, SeekFrom, Write};
 use std::path;
-
-use log::{info, trace};
-use serde::{Deserialize, Serialize};
-
-use super::binary_io as binio;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -52,13 +49,52 @@ impl From<binio::Error> for Error {
 }
 
 #[derive(Debug)]
+/// A Slab is meta information about an existing SSTable
+///
+/// In the LSM the engine holds a list of know slabs and uses
+/// those to find the SSTable that might contain the key that
+/// it's looking for. If the slab covers the key it gives accesss
+/// to the associated SSTable which can then be use to do the lookup.
 pub struct Slab {
+    /// The level of the slab and its associated SSTable
     pub level: Level,
-    pub max_key: Key,
-    pub min_key: Key,
-    pub path: path::PathBuf,
+    /// The smallest key that is stored in this slab
+    min_key: Key,
+    /// The greatest key that is stored in this slab
+    max_key: Key,
+    /// The path to the SSTable file
+    path: path::PathBuf,
 }
 
+impl Slab {
+    pub fn new(level: Level, path: &path::Path, min_key: Key, max_key: Key) -> Slab {
+        Slab {
+            level,
+            path: path.to_owned(),
+            min_key,
+            max_key,
+        }
+    }
+
+    /// Check if the provided `key` might be found in the associated `SSTable`.
+    /// If this function returns false, the key is definitely not in the `SSTable`.
+    /// If this function returns true, the key might be in the `SSTable`.
+    pub fn covers(&self, k: &Key) -> bool {
+        k >= &self.min_key && k <= &self.max_key
+    }
+
+    /// Open the associated `SSTable`
+    pub fn sstable(&self) -> Result<SSTable> {
+        SSTable::open(&self.path)
+    }
+}
+
+/// Readonly SSTable
+///
+/// An SSTable is a sorted string table that is immutable.
+/// The only supported operations are opening and reading from it.
+///
+/// You can open an SSTable by calling the `sstable()` method of a `Slab`.
 pub struct SSTable {
     // TODO: a trie could be a better choice memory-wise?
     index: HashMap<Key, Offset>,
@@ -67,6 +103,11 @@ pub struct SSTable {
 }
 
 impl SSTable {
+    /// Lookup the value for the provided `Key` `k`
+    ///
+    /// This method performs a lookup in the file that backs the SSTable
+    /// returning the value that is associated with the provided key, if
+    /// it exists.
     pub fn get(&mut self, k: &Key) -> Result<Option<Value>> {
         match self.index.get(k) {
             Some(offset) => {
@@ -81,7 +122,7 @@ impl SSTable {
         }
     }
 
-    pub fn open(path: &path::Path) -> Result<SSTable> {
+    fn open(path: &path::Path) -> Result<SSTable> {
         let mut reader = Reader::open(path)?;
         let mut index: HashMap<Key, Offset> = HashMap::new();
         reader.read_index_into(&mut index)?;
@@ -94,9 +135,9 @@ impl SSTable {
     }
 }
 
-// On disk representation of SSTable as runs of sorted data:
-// The following is a depiction of the table format
-//
+////////////////////////////////////////////////////////////
+// SSTable on disk layout
+////////////////////////////////////////////////////////////
 // DATA_BLOCK
 //   key_size key value_length value
 //   ...
@@ -104,33 +145,16 @@ impl SSTable {
 //   meta_size data
 // INDEX_BLOCK
 // TRAILER
+// TRAILER_OFFSET
 
-#[derive(Serialize, Deserialize, Debug)]
-struct Trailer {
-    meta_offset: Offset,
-    index_offset: Offset,
-    version: u8,
-    stanza: Vec<u8>,
-}
-
-impl Trailer {
-    fn new(meta_offset: Offset, index_offset: Offset) -> Trailer {
-        Trailer {
-            meta_offset,
-            index_offset,
-            version: 0x1,
-            stanza: STANZA.as_bytes().to_vec(),
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Meta {
-    pub data_size: usize,
-    pub data_block_count: usize,
-    pub index_size: usize,
-}
-
+/// SSTable Writer is used to flush a memtable to disk
+///
+/// Once the in memory table becomes too large it will be flushed to disk,
+/// where it can be used to retrieve data again later.
+///
+/// The writer stores the sorted strings and control data in a file.
+/// Once all key value pairs have been written, callers have to seal the table
+/// which finishes it of and returns a `Slab`.
 pub struct Writer {
     file: io::BufWriter<fs::File>,
     data_bytes_written: usize,
@@ -141,6 +165,7 @@ pub struct Writer {
 }
 
 impl Writer {
+    /// Create a new on disk SSTable with this writer
     pub fn create(path: &path::Path) -> Result<Self> {
         let file = io::BufWriter::new(OpenOptions::new().create(true).write(true).open(path)?);
 
@@ -154,6 +179,9 @@ impl Writer {
         })
     }
 
+    /// Append a new key value pair to the SSTable
+    ///
+    /// The caller _must_ make that keys are added in _ascending_ order.
     pub fn append(&mut self, k: Key, v: Value) -> Result<()> {
         trace!("append key {:?} offset: {}", k, self.data_bytes_written);
 
@@ -170,6 +198,14 @@ impl Writer {
         Ok(())
     }
 
+    /// Finis the table by adding control data and making it immutable.
+    /// Once this operation finishes the on disk SSTable is finalized,
+    /// which means:
+    ///
+    /// * All data items are written
+    /// * An index has been written
+    /// * Meta data has been written which allows to read the table back in
+    /// * All data has been flushed
     pub fn seal(&mut self) -> Result<Slab> {
         if self.sealed {
             return Err(Error::SealedTableError);
@@ -244,18 +280,17 @@ impl Writer {
     }
 }
 
-// Reader
-
+// Reader is an internal API that allows to read on disk SSTable data
 type ReaderStorage = io::BufReader<fs::File>;
 
-pub struct Reader {
+struct Reader {
     file: ReaderStorage,
     meta: Meta,
     trailer: Trailer,
 }
 
 impl Reader {
-    pub fn open(path: &path::Path) -> Result<Self> {
+    fn open(path: &path::Path) -> Result<Self> {
         let mut file = io::BufReader::new(OpenOptions::new().read(true).open(path)?);
         let (meta, trailer) = Reader::read_control_data(&mut file)?;
 
@@ -266,13 +301,13 @@ impl Reader {
         })
     }
 
-    pub fn read_record(&mut self, offset: Offset) -> Result<Value> {
+    fn read_record(&mut self, offset: Offset) -> Result<Value> {
         self.file.seek(SeekFrom::Start(offset as u64))?;
         let value = binio::read_data_owned(&mut self.file)?;
         Ok(value)
     }
 
-    pub fn read_index_into(&mut self, index: &mut HashMap<Key, Offset>) -> Result<()> {
+    fn read_index_into(&mut self, index: &mut HashMap<Key, Offset>) -> Result<()> {
         self.file
             .seek(SeekFrom::Start(self.trailer.index_offset as u64))?;
 
@@ -299,5 +334,51 @@ impl Reader {
         trace!("read meta {:?} offset: {}", meta, trailer.meta_offset);
 
         Ok((meta, trailer))
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Trailer {
+    meta_offset: Offset,
+    index_offset: Offset,
+    version: u8,
+    stanza: Vec<u8>,
+}
+
+impl Trailer {
+    fn new(meta_offset: Offset, index_offset: Offset) -> Trailer {
+        Trailer {
+            meta_offset,
+            index_offset,
+            version: 0x1,
+            stanza: STANZA.as_bytes().to_vec(),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug)]
+struct Meta {
+    data_size: usize,
+    data_block_count: usize,
+    index_size: usize,
+}
+
+mod tests {
+    use super::*;
+
+    #[test]
+    fn slab_covers_when_key_is_covered() {
+        let slab = Slab::new(
+            0,
+            path::Path::new("/tmp"),
+            "alpha".as_bytes().to_vec(),
+            "gamma".as_bytes().to_vec(),
+        );
+
+        assert!(slab.covers(&"alpha".as_bytes().to_vec()));
+        assert!(slab.covers(&"beta".as_bytes().to_vec()));
+        assert!(!slab.covers(&"iota".as_bytes().to_vec()));
+        assert!(slab.covers(&"gamma".as_bytes().to_vec()));
+        assert!(!slab.covers(&"gammb".as_bytes().to_vec()));
     }
 }

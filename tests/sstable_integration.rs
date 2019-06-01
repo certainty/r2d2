@@ -18,7 +18,7 @@ fn check_write_sstable() {
     assert!(writer.append(str_vec("baz"), str_vec("frooble")).is_ok());
 
     let slab = writer.seal().unwrap();
-    let mut sstable = sstable::SSTable::open(&slab.path).unwrap();
+    let mut sstable = slab.sstable().unwrap();
 
     assert_eq!(Some(str_vec("bar")), sstable.get(&str_vec("foo")).unwrap());
     assert_eq!(Some(str_vec("baz")), sstable.get(&str_vec("bar")).unwrap());

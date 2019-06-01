@@ -1,3 +1,8 @@
+//! Binary IO primitives
+//!
+//! This is an internal module that provides primitive operations to do binary IO
+//! It provides methods to read and write length tagged data frames as well as a
+//! generic capability to read and write serde serializable data.
 use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
