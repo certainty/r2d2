@@ -10,18 +10,6 @@
 //! This module also provides functioniolatity run compaction on the SSTables and thus
 //! merge intermediate tables together.
 //!
-//! ## Examples:
-//!     
-//!     use r2d2::engine::storage::lsm::sstable;
-//!     let table_writer = sstable::Writer::create("path/to/sstable").unwrap();
-//!     
-//!     table_writer.append("foo", "bar").unwrap();
-//!     table_writer.append("foobar", "baz").unwrap();
-//!     table_writer.seal();
-//!
-//!     /// No more writes are allowed
-//!
-//!
 //!
 use super::binary_io as binio;
 use log::{info, trace};
