@@ -8,25 +8,27 @@
 //! related to the management of the local LSM. It might spawn additional
 //! threads.
 
-extern crate skiplist;
-pub mod wal;
-
-use log::{info, trace};
-use skiplist::SkipMap;
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::result;
+
+use log::info;
+
+mod binary_io;
+pub mod sstable;
+pub mod wal;
 
 type Result<T> = result::Result<T, Error>;
 
 #[derive(Debug, PartialEq)]
 pub enum Error {
-    CommitLogError(wal::Error),
+    WalError(wal::Error),
     IoError(std::io::ErrorKind),
 }
 
 impl From<wal::Error> for Error {
     fn from(e: wal::Error) -> Self {
-        Error::CommitLogError(e)
+        Error::WalError(e)
     }
 }
 
@@ -36,7 +38,7 @@ impl From<std::io::Error> for Error {
     }
 }
 
-type Memtable = SkipMap<Vec<u8>, Vec<u8>>;
+type Memtable = BTreeMap<Vec<u8>, Vec<u8>>;
 
 pub struct LSM {
     wal: wal::WalWriter,
@@ -57,7 +59,7 @@ pub fn init(base_directory: &Path) -> Result<LSM> {
 }
 
 fn init_clean(wal: &wal::Wal) -> Result<LSM> {
-    let memtable = SkipMap::new();
+    let memtable = Memtable::new();
 
     info!(target: "LSM", "starting lsm with fresh commit log",);
 
@@ -70,7 +72,7 @@ fn init_clean(wal: &wal::Wal) -> Result<LSM> {
 fn init_with_recovery(wal: &wal::Wal) -> Result<LSM> {
     info!(target: "LSM", "starting recovery from WAL");
 
-    let memtable = SkipMap::new();
+    let memtable = Memtable::new();
     let mut lsm_for_repair = LSM {
         wal: wal.null()?,
         memtable,
@@ -95,7 +97,7 @@ fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
                 ()
             }
             wal::Operation::Delete(key) => {
-                lsm.del(key)?;
+                lsm.del(&key)?;
                 ()
             }
         }
@@ -110,13 +112,13 @@ impl LSM {
         Ok(self.memtable.insert(k, v))
     }
 
-    pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.wal.write(wal::Operation::Delete(&k))?;
-        Ok(self.memtable.remove(&k))
+    pub fn del(&mut self, k: &Vec<u8>) -> Result<Option<Vec<u8>>> {
+        self.wal.write(wal::Operation::Delete(k))?;
+        Ok(self.memtable.remove(k))
     }
 
-    pub fn get(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>> {
-        Ok(self.memtable.get(&k))
+    pub fn get(&self, k: &Vec<u8>) -> Result<Option<&Vec<u8>>> {
+        Ok(self.memtable.get(k))
     }
 
     pub fn keys(&self) -> Result<Vec<&Vec<u8>>> {

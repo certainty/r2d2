@@ -38,17 +38,17 @@ impl Engine for DefaultEngine {
         Ok(previous.map(|i| Value::new(i)))
     }
 
-    fn del(&mut self, key: Key) -> Result<Option<Value>, EngineError> {
+    fn del(&mut self, key: &Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Delete {:?}", key);
 
-        let previous = self.lsm.del(key.data)?;
+        let previous = self.lsm.del(&key.data)?;
         Ok(previous.map(|v| Value::new(v)))
     }
 
-    fn get(&self, key: Key) -> Result<Option<Value>, EngineError> {
+    fn get(&self, key: &Key) -> Result<Option<Value>, EngineError> {
         trace!(target: "engine", "Lookup {:?}", key);
 
-        let value = self.lsm.get(key.data)?;
+        let value = self.lsm.get(&key.data)?;
         // TODO: do we really want to copy here?
         Ok(value.map(|v| Value::new(v.clone())))
     }

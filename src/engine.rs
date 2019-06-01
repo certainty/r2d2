@@ -18,6 +18,7 @@ pub mod storage;
 // A key is an arbitray sequence of bytes
 // For concenience there are conversions from String and to Vec<u8>
 #[derive(Debug, PartialEq)]
+#[repr(transparent)]
 pub struct Key {
     pub data: Vec<u8>,
 }
@@ -43,6 +44,7 @@ impl Deref for Key {
 }
 
 #[derive(Debug, PartialEq)]
+#[repr(transparent)]
 pub struct Value {
     pub data: Vec<u8>,
 }
@@ -89,14 +91,14 @@ pub trait Engine {
     // If the function returns successfully, the following guarantees hold:
     // * the change is durable on the local node.
     // * the key/value can not be found anymore (unless it has been re-inserted)
-    fn del(&mut self, key: Key) -> Result<Option<Value>, Error>;
+    fn del(&mut self, key: &Key) -> Result<Option<Value>, Error>;
 
     // Lookup a value for the given key
     //
     // Find a value for the given key if it exists.
     // This operation might fail, e.g. when implementatons need to access the
     // filesystem or the network.
-    fn get(&self, key: Key) -> Result<Option<Value>, Error>;
+    fn get(&self, key: &Key) -> Result<Option<Value>, Error>;
 
     // List all the currently stored keys
     //
