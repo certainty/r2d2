@@ -81,7 +81,7 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
             }
         }
 
-        Command::Delete(key) => match engine.del(Key::from_string(&key)) {
+        Command::Delete(key) => match engine.del(&Key::from_string(&key)) {
             Ok(Some(value)) => {
                 Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap()))
             }
@@ -89,7 +89,7 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
             Err(msg) => Output::Error(format!("{:?}", msg)),
         },
 
-        Command::Lookup(key) => match engine.get(Key::from_string(&key)) {
+        Command::Lookup(key) => match engine.get(&Key::from_string(&key)) {
             Ok(Some(value)) => {
                 Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap()))
             }

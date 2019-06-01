@@ -9,22 +9,21 @@
 //! write through the FS cache.
 
 extern crate crc;
+
 use std::convert::From;
 use std::fs;
 use std::io;
+use std::io::{BufReader, BufWriter, Write};
 use std::path;
 use std::sync::{Arc, Mutex};
 
+use log::trace;
 use serde;
 use serde::{Deserialize, Serialize};
 
-use super::binary_io as binio;
 use crate::engine::storage::lsm::wal::Error::BinIoError;
-use byteorder::LittleEndian;
-use byteorder::{ReadBytesExt, WriteBytesExt};
-use log::{error, trace};
-use std::io::{BufReader, BufWriter, Write};
-use std::path::PathBuf;
+
+use super::binary_io as binio;
 
 const VERSION: u8 = 1;
 const STANZA: &str = "r2d2::wal";
@@ -39,13 +38,11 @@ pub fn init(storage_path: &path::Path) -> Result<Wal> {
     std::fs::create_dir_all(&wal_path)?;
 
     Ok(Wal {
-        directory: wal_path,
         active_file: wal_file_name,
     })
 }
 
 pub struct Wal {
-    directory: path::PathBuf,
     active_file: path::PathBuf,
 }
 
@@ -206,7 +203,9 @@ impl Iterator for WalReader {
 }
 
 mod tests {
-    use super::*;
+    use super::binio;
+    use super::Operation;
+    use std::io;
 
     #[test]
     fn read_your_write() {

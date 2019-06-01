@@ -8,14 +8,15 @@
 //! related to the management of the local LSM. It might spawn additional
 //! threads.
 
-mod binary_io;
-pub mod sstable;
-pub mod wal;
-
-use log::{info, trace};
 use std::collections::BTreeMap;
 use std::path::Path;
 use std::result;
+
+use log::info;
+
+mod binary_io;
+pub mod sstable;
+pub mod wal;
 
 type Result<T> = result::Result<T, Error>;
 
@@ -96,7 +97,7 @@ fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
                 ()
             }
             wal::Operation::Delete(key) => {
-                lsm.del(key)?;
+                lsm.del(&key)?;
                 ()
             }
         }
@@ -111,13 +112,13 @@ impl LSM {
         Ok(self.memtable.insert(k, v))
     }
 
-    pub fn del(&mut self, k: Vec<u8>) -> Result<Option<Vec<u8>>> {
-        self.wal.write(wal::Operation::Delete(&k))?;
-        Ok(self.memtable.remove(&k))
+    pub fn del(&mut self, k: &Vec<u8>) -> Result<Option<Vec<u8>>> {
+        self.wal.write(wal::Operation::Delete(k))?;
+        Ok(self.memtable.remove(k))
     }
 
-    pub fn get(&self, k: Vec<u8>) -> Result<Option<&Vec<u8>>> {
-        Ok(self.memtable.get(&k))
+    pub fn get(&self, k: &Vec<u8>) -> Result<Option<&Vec<u8>>> {
+        Ok(self.memtable.get(k))
     }
 
     pub fn keys(&self) -> Result<Vec<&Vec<u8>>> {

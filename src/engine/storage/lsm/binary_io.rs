@@ -2,8 +2,7 @@ use byteorder::LittleEndian;
 use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
 use std::io;
-use std::io::{BufReader, BufWriter, Read};
-use std::path::PathBuf;
+use std::io::Read;
 
 type Result<T> = std::result::Result<T, Error>;
 pub const LENGTH_TAG_SIZE: i8 = 4;

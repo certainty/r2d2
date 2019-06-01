@@ -10,7 +10,7 @@ fn basic_operation_works() {
     setup();
     let mut ngin = engine::default::new(PathBuf::from(TEST_ENGINE_DIRECTORY));
 
-    assert_eq!(ngin.get(Key::from_string("foo")), Ok(None));
+    assert_eq!(ngin.get(&Key::from_string("foo")), Ok(None));
 
     assert_eq!(
         ngin.set(Key::from_string("foo"), Value::from_string("bar")),
@@ -18,7 +18,7 @@ fn basic_operation_works() {
     );
 
     assert_eq!(
-        ngin.get(Key::from_string("foo")),
+        ngin.get(&Key::from_string("foo")),
         Ok(Some(Value::from_string("bar")))
     );
 
@@ -26,14 +26,14 @@ fn basic_operation_works() {
         .unwrap();
 
     assert_eq!(
-        ngin.get(Key::from_string("foo")),
+        ngin.get(&Key::from_string("foo")),
         Ok(Some(Value::from_string("updated")))
     );
 
     assert_eq!(
-        ngin.del(Key::from_string("foo")),
+        ngin.del(&Key::from_string("foo")),
         Ok(Some(Value::from_string("updated")))
     );
 
-    assert_eq!(ngin.get(Key::from_string("foo")), Ok(None));
+    assert_eq!(ngin.get(&Key::from_string("foo")), Ok(None));
 }

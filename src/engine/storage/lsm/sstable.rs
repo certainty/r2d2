@@ -11,16 +11,17 @@
 //! merge intermediate tables together.
 //!
 //!
-use super::binary_io as binio;
-use log::{info, trace};
-use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
 use std::io;
-use std::io::{BufReader, Seek, SeekFrom, Write};
-use std::net::Shutdown::Read;
+use std::io::{Seek, SeekFrom, Write};
 use std::path;
+
+use log::{info, trace};
+use serde::{Deserialize, Serialize};
+
+use super::binary_io as binio;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
