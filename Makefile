@@ -6,31 +6,31 @@ CARGO = cargo --color $(COLOR)
 all: build
 
 bench:
-	@$(CARGO) bench
+	$(CARGO) bench
 
 build:
-	@$(CARGO) build
+	$(CARGO) build
 
 check:
-	@$(CARGO) check
+	$(CARGO) check
 
 clean:
-	@$(CARGO) clean
+	$(CARGO) clean
 
 doc:
-	@$(CARGO) doc
+	$(CARGO) doc
 
 install: build
-	@$(CARGO) install
+	$(CARGO) install
 
 publish:
-	@$(CARGO) publish
+	$(CARGO) publish
 
 run: build
-	@$(CARGO) run repl
+	$(CARGO) run repl
 
 test: build
-	RUST_TEST_THREADS=1 @$(CARGO) test -- --nocpature
+	RUST_TEST_THREADS=1 $(CARGO) test -- --nocapture
 
 update:
-	@$(CARGO) update
+	$(CARGO) update
