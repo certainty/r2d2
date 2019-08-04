@@ -1,4 +1,4 @@
-# Key value store in rust
+# Key value store in Rust
 
 This is an implementation of a key-value store in Rust.
 It is currently for educational purposes only to:
