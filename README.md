@@ -1,3 +1,5 @@
+[![Build Status](https://travis-ci.com/certainty/r2d2.svg?token=4u7ZeAMZynyk9xmAA6Tm&branch=master)](https://travis-ci.com/certainty/r2d2)
+
 # Key value store in Rust
 
 This is an implementation of a key-value store in Rust.
