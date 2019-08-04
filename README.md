@@ -1,5 +1,11 @@
 # Key value store in rust
-Learning project that implements a distibuted kv store that uses CURP for replication.
+
+This is an implementation of a key-value store in Rust.
+It is currently for educational purposes only to:
+
+* Learn Rust
+* Get a deeper understanding of log structured merge trees
+* Play with the CURP replication protocol
 
 ## Run the repl to interact with the store
 
