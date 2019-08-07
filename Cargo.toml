@@ -10,7 +10,7 @@ path="src/lib.rs"
 
 [dependencies]
 nom = "4.2.3"
-rustyline = "3.0.0"
+rustyline = "5.0.1"
 termion = "1.5.1"
 log = "0.4.6"
 env_logger = "0.6.1"
