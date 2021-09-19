@@ -1,3 +1,5 @@
+mod server;
+
 extern crate env_logger;
 extern crate log;
 use clap::{AppSettings, Clap};
