@@ -12,13 +12,14 @@ use std::collections::BTreeMap;
 use std::path::Path;
 use std::result;
 
+use super::Configuration;
+use crate::engine::{EngineIterator, Key, Value};
 use log::info;
+use thiserror::Error;
 
 mod binary_io;
 pub mod sstable;
 pub mod wal;
-use crate::engine::{EngineIterator, Key, Value};
-use thiserror::Error;
 
 type Result<T> = result::Result<T, Error>;
 
@@ -34,72 +35,75 @@ type Memtable = BTreeMap<Key, Value>;
 pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
 
 pub struct LSM {
+    config: Configuration,
     wal: wal::WalWriter,
     memtable: Memtable,
 }
 
-pub fn init(base_directory: &Path) -> Result<LSM> {
-    let wal = wal::init(base_directory)?;
+impl LSM {
+    pub fn new(config: Configuration) -> Result<LSM> {
+        let wal = wal::init(&config.storage_path)?;
 
-    let lsm = if wal.recovery_needed() {
-        init_with_recovery(&wal)
-    } else {
-        init_clean(&wal)
-    };
+        let lsm = if wal.recovery_needed() {
+            Self::init_with_recovery(config, &wal)
+        } else {
+            Self::init_clean(config, &wal)
+        };
 
-    info!(target: "LSM","lsm subsystem initialized and ready");
-    lsm
-}
-
-fn init_clean(wal: &wal::Wal) -> Result<LSM> {
-    let memtable = Memtable::new();
-
-    info!(target: "LSM", "starting lsm with fresh commit log",);
-
-    Ok(LSM {
-        wal: wal.create()?,
-        memtable,
-    })
-}
-
-fn init_with_recovery(wal: &wal::Wal) -> Result<LSM> {
-    info!(target: "LSM", "starting recovery from WAL");
-
-    let memtable = Memtable::new();
-    let mut lsm_for_repair = LSM {
-        wal: wal.null()?,
-        memtable,
-    };
-
-    recover(&mut lsm_for_repair, &wal)?;
-    info!(target: "LSM", "recovery completed successfully");
-
-    Ok(LSM {
-        wal: wal.resume()?,
-        ..lsm_for_repair
-    })
-}
-
-fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
-    let reader = wal.open()?;
-
-    for result_of_op in reader {
-        match result_of_op? {
-            wal::Operation::Set(key, value) => {
-                lsm.set(key, value)?;
-                ()
-            }
-            wal::Operation::Delete(key) => {
-                lsm.del(&key)?;
-                ()
-            }
-        }
+        info!(target: "LSM","lsm subsystem initialized and ready");
+        lsm
     }
 
-    Ok(())
-}
+    fn init_clean(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
+        let memtable = Memtable::new();
 
-impl LSM {
+        info!(target: "LSM", "starting lsm with fresh commit log",);
+
+        Ok(LSM {
+            config,
+            wal: wal.create()?,
+            memtable,
+        })
+    }
+
+    fn init_with_recovery(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
+        info!(target: "LSM", "starting recovery from WAL");
+
+        let memtable = Memtable::new();
+        let mut lsm_for_repair = LSM {
+            config,
+            wal: wal.null()?,
+            memtable,
+        };
+
+        recover(&mut lsm_for_repair, &wal)?;
+        info!(target: "LSM", "recovery completed successfully");
+
+        Ok(LSM {
+            wal: wal.resume()?,
+            ..lsm_for_repair
+        })
+    }
+
+    fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
+        let reader = wal.open()?;
+
+        for result_of_op in reader {
+            match result_of_op? {
+                wal::Operation::Set(key, value) => {
+                    lsm.set(key, value)?;
+                    ()
+                }
+                wal::Operation::Delete(key) => {
+                    lsm.del(&key)?;
+                    ()
+                }
+            }
+        }
+
+        Ok(())
+    }
+
     pub fn set(&mut self, k: Key, v: Value) -> Result<Option<Value>> {
         self.wal.write(wal::Operation::Set(&k, &v))?;
         Ok(self.memtable.insert(k, v))

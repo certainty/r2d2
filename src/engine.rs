@@ -12,55 +12,85 @@
 /// with the OS or the network which are unreliable components.
 use thiserror::Error;
 
-pub mod default;
+pub mod configuration;
+pub mod directories;
 pub mod key;
 pub mod storage;
 pub mod value;
+use log::*;
 
 // re-exports for convenience
+use crate::engine::configuration::Configuration;
 pub use key::Key;
 use std::fmt::Debug;
+use std::path::PathBuf;
 pub use value::Value;
 
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
     StorageError(#[from] storage::lsm::Error),
+    #[error(transparent)]
+    ConfigError(#[from] configuration::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-pub trait Engine {
-    // Insert a key value pair into the store
-    //
-    // when this function returns successfully, the following guarantees hold:
-    // * the change is durable on the local node.
-    // * a local lookup will return the inserted value (unless there was an update in between)
+pub struct Engine {
+    lsm: storage::lsm::LSM,
+}
+
+impl Engine {
+    pub fn new(config: Configuration) -> Result<Self> {
+        let lsm = storage::lsm::LSM::new(config.storage)?;
+        Ok(Self { lsm })
+    }
+
+    pub fn default() -> Result<Engine> {
+        Self::new(storage::Configuration::default()?)
+    }
+
+    /// Insert a key value pair into the store
+    ///
+    /// when this function returns successfully, the following guarantees hold:
+    /// * the change is durable on the local node.
+    /// * a local lookup will return the inserted value (unless there was an update in between)
     fn set<K: Into<Key> + Debug, V: Into<Value> + Debug>(
         &mut self,
         key: K,
         value: V,
-    ) -> Result<Option<Value>>;
+    ) -> Result<Option<Value>> {
+        trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
+        Ok(self.lsm.set(key.into(), value.into())?)
+    }
 
-    // Delete a key from the store
-    //
-    // The key doesn not need to exist in which case the operation is a noop.
-    // It is expected that the operation returns the value of the key that has
-    // been deleted if it existed.
-    //
-    // If the function returns successfully, the following guarantees hold:
-    // * the change is durable on the local node.
-    // * the key/value can not be found anymore (unless it has been re-inserted)
-    fn del(&mut self, key: &Key) -> Result<Option<Value>>;
+    /// Delete a key from the store
+    ///
+    /// The key does not need to exist in which case the operation is a noop.
+    /// It is expected that the operation returns the value of the key that has
+    /// been deleted if it existed.
+    ///
+    /// If the function returns successfully, the following guarantees hold:
+    /// * the change is durable on the local node.
+    /// * the key/value can not be found anymore (unless it has been re-inserted)
+    fn del(&mut self, key: &Key) -> Result<Option<Value>> {
+        trace!(target: "engine", "Delete {:?}", key);
+        Ok(self.lsm.del(&key)?)
+    }
 
-    // Lookup a value for the given key
-    //
-    // Find a value for the given key if it exists.
-    // This operation might fail, e.g. when implementatons need to access the
-    // filesystem or the network.
-    fn get(&self, key: &Key) -> Result<Option<&Value>>;
+    /// Lookup a value for the given key
+    ///
+    /// Find a value for the given key if it exists.
+    /// This operation might fail, e.g. when implementatons need to access the
+    /// filesystem or the network.
+    fn get(&self, key: &Key) -> Result<Option<&Value>> {
+        trace!(target: "engine", "Lookup {:?}", key);
+        Ok(self.lsm.get(&key)?)
+    }
 
-    fn iter(&self) -> EngineIterator;
+    fn iter(&self) -> EngineIterator {
+        self.lsm.iter()
+    }
 }
 
 pub struct EngineIterator<'a> {

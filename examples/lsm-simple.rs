@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 fn main() -> Result<()> {
     env_logger::init();
-    let mut engine = engine::default::new(PathBuf::from("/tmp"));
+    let mut engine = engine::lsm_engine::new(PathBuf::from("/tmp"));
 
     engine.set("Foo", "this is the value I want to store")?;
     engine.set("Bar", "some other value")?;
