@@ -17,25 +17,16 @@ use log::info;
 mod binary_io;
 pub mod sstable;
 pub mod wal;
+use thiserror::Error;
 
 type Result<T> = result::Result<T, Error>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum Error {
-    WalError(wal::Error),
-    IoError(std::io::ErrorKind),
-}
-
-impl From<wal::Error> for Error {
-    fn from(e: wal::Error) -> Self {
-        Error::WalError(e)
-    }
-}
-
-impl From<std::io::Error> for Error {
-    fn from(e: std::io::Error) -> Self {
-        Error::IoError(e.kind())
-    }
+    #[error(transparent)]
+    WalError(#[from] wal::Error),
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 type Memtable = BTreeMap<Vec<u8>, Vec<u8>>;

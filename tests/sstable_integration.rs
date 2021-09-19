@@ -1,7 +1,7 @@
 mod utils;
 
 use r2d2::engine::storage::lsm::sstable;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use utils::*;
 
 #[test]

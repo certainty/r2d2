@@ -1,16 +1,17 @@
-//! The engine is the main abstraction that you use
-//! to interact with the key-value store system.
-//!
-//! The engine owns all key-value pairs and takes care of
-//! interacting with them, delegating storage to its subsystem.
-//!
-//! It maintains the local state as well as providing
-//! the necessary data transfer to update the cluster state if required.
-//!
-//! It presents itself with a dictionary-like interfacer where each operation
-//! might fail. This is deliberate since every operation has to potentially interact
-//! with the OS or the network which are unreliable components.
+/// The engine is the main abstraction that you use
+/// to interact with the key-value store system.
+///
+/// The engine owns all key-value pairs and takes care of
+/// interacting with them, delegating storage to its subsystem.
+///
+/// It maintains the local state as well as providing
+/// the necessary data transfer to update the cluster state if required.
+///
+/// It presents itself with a dictionary-like interfacer where each operation
+/// might fail. This is deliberate since every operation has to potentially interact
+/// with the OS or the network which are unreliable components.
 use std::ops::Deref;
+use thiserror::Error;
 
 pub mod default;
 pub mod storage;
@@ -69,18 +70,21 @@ impl Value {
     }
 }
 
-#[derive(PartialEq, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    StorageError(storage::lsm::Error),
+    #[error(transparent)]
+    StorageError(#[from] storage::lsm::Error),
 }
+
+pub type Result<T> = std::result::Result<T, Error>;
 
 pub trait Engine {
     // Insert a key value pair into the store
     //
     // when this function returns successfully, the following guarantees hold:
     // * the change is durable on the local node.
-    // * a local lookup will return the inserted value (unless there was an update inbetween)
-    fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>, Error>;
+    // * a local lookup will return the inserted value (unless there was an update in between)
+    fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>>;
 
     // Delete a key from the store
     //
@@ -91,18 +95,18 @@ pub trait Engine {
     // If the function returns successfully, the following guarantees hold:
     // * the change is durable on the local node.
     // * the key/value can not be found anymore (unless it has been re-inserted)
-    fn del(&mut self, key: &Key) -> Result<Option<Value>, Error>;
+    fn del(&mut self, key: &Key) -> Result<Option<Value>>;
 
     // Lookup a value for the given key
     //
     // Find a value for the given key if it exists.
     // This operation might fail, e.g. when implementatons need to access the
     // filesystem or the network.
-    fn get(&self, key: &Key) -> Result<Option<Value>, Error>;
+    fn get(&self, key: &Key) -> Result<Option<Value>>;
 
     // List all the currently stored keys
     //
     // This is purely for debug reasons as in any real system the amount of keys
     // might grow way too large to return them all in a vector.
-    fn keys(&self) -> Result<Vec<Key>, Error>;
+    fn keys(&self) -> Result<Vec<Key>>;
 }

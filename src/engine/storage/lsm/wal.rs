@@ -9,20 +9,17 @@
 //! write through the FS cache.
 extern crate crc;
 
+use super::binary_io as binio;
+use log::trace;
+use serde;
+use serde::{Deserialize, Serialize};
 use std::convert::From;
 use std::fs;
 use std::io;
 use std::io::{BufReader, BufWriter, Write};
 use std::path;
 use std::sync::{Arc, Mutex};
-
-use log::trace;
-use serde;
-use serde::{Deserialize, Serialize};
-
-use crate::engine::storage::lsm::wal::Error::BinIoError;
-
-use super::binary_io as binio;
+use thiserror::Error;
 
 const VERSION: u8 = 1;
 const STANZA: &str = "r2d2::wal";
@@ -87,23 +84,14 @@ impl Wal {
     }
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Error, Debug)]
 pub enum Error {
-    IoError(io::ErrorKind),
-    BinIoError(binio::Error),
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error(transparent)]
+    BinIoError(#[from] binio::Error),
+    #[error("LockError")]
     LockError,
-}
-
-impl From<binio::Error> for Error {
-    fn from(e: binio::Error) -> Self {
-        BinIoError(e)
-    }
-}
-
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::IoError(e.kind())
-    }
 }
 
 impl<T> From<std::sync::PoisonError<T>> for Error {
@@ -229,13 +217,18 @@ impl Iterator for WalReader {
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.read() {
-            Err(Error::BinIoError(binio::Error::IoError(io::ErrorKind::UnexpectedEof))) => None,
+            Err(Error::BinIoError(binio::Error::IoError(io_error)))
+                if io_error.kind() == io::ErrorKind::UnexpectedEof =>
+            {
+                None
+            }
             Err(e) => Some(Err(e)),
             ok => Some(ok),
         }
     }
 }
 
+#[cfg(test)]
 mod tests {
     use super::binio;
     use super::Operation;

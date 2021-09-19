@@ -13,12 +13,6 @@ use super::storage::lsm;
 use super::Error as EngineError;
 use super::{Engine, Key, Value};
 
-impl From<lsm::Error> for EngineError {
-    fn from(e: lsm::Error) -> Self {
-        super::Error::StorageError(e)
-    }
-}
-
 pub struct DefaultEngine {
     lsm: lsm::LSM,
 }

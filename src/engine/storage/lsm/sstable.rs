@@ -19,6 +19,7 @@ use std::fs::OpenOptions;
 use std::io;
 use std::io::{Seek, SeekFrom, Write};
 use std::path;
+use thiserror::Error;
 
 type Key = Vec<u8>;
 type Value = Vec<u8>;
@@ -28,33 +29,25 @@ type Result<T> = std::result::Result<T, Error>;
 
 const STANZA: &str = "r2d2::sstable";
 
-#[derive(PartialEq, Debug)]
+#[derive(Error, Debug)]
 pub enum Error {
-    IoError(io::ErrorKind),
-    BinIoError(binio::Error),
+    #[error(transparent)]
+    IoError(#[from] io::Error),
+    #[error(transparent)]
+    BinIoError(#[from] binio::Error),
+    #[error("EmptyTableError")]
     EmptyTable,
+    #[error("SealedTableError")]
     SealedTableError,
 }
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::IoError(e.kind())
-    }
-}
-
-impl From<binio::Error> for Error {
-    fn from(e: binio::Error) -> Self {
-        Error::BinIoError(e)
-    }
-}
-
-#[derive(Debug)]
 /// A Slab is meta information about an existing SSTable
 ///
 /// In the LSM the engine holds a list of know slabs and uses
 /// those to find the SSTable that might contain the key that
 /// it's looking for. If the slab covers the key it gives accesss
 /// to the associated SSTable which can then be use to do the lookup.
+#[derive(Debug)]
 pub struct Slab {
     /// The level of the slab and its associated SSTable
     pub level: Level,
@@ -363,8 +356,10 @@ struct Meta {
     index_size: usize,
 }
 
+#[cfg(test)]
 mod tests {
-    use super::*;
+    use super::Slab;
+    use std::path;
 
     #[test]
     fn slab_covers_when_key_is_covered() {

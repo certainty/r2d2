@@ -8,28 +8,25 @@ use byteorder::{ReadBytesExt, WriteBytesExt};
 use log::{error, trace};
 use std::io;
 use std::io::Read;
+use thiserror::Error;
 
-type Result<T> = std::result::Result<T, Error>;
 pub const LENGTH_TAG_SIZE: i8 = 4;
 
-#[derive(Debug, PartialEq)]
-pub enum Error {
-    SerializationError,
-    IoError(io::ErrorKind),
-}
+type Result<T> = std::result::Result<T, Error>;
 
-impl From<io::Error> for Error {
-    fn from(e: io::Error) -> Self {
-        Error::IoError(e.kind())
-    }
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("SerializationError")]
+    SerializationError,
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
 }
 
 pub fn read_data_size<R>(r: &mut R) -> Result<u32>
 where
     R: io::Read,
 {
-    r.read_u32::<LittleEndian>()
-        .map_err(|e| Error::IoError(e.kind()))
+    Ok(r.read_u32::<LittleEndian>()?)
 }
 
 pub fn write_data_size<W>(w: &mut W, d: usize) -> Result<usize>
