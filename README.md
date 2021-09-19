@@ -1,4 +1,5 @@
-[![Build Status](https://travis-ci.com/certainty/r2d2.svg?token=4u7ZeAMZynyk9xmAA6Tm&branch=master)](https://travis-ci.com/certainty/r2d2)
+
+[![Rust](https://github.com/certainty/r2d2/actions/workflows/rust.yml/badge.svg)](https://github.com/certainty/r2d2/actions/workflows/rust.yml)
 
 # Key value store in Rust
 
