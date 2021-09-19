@@ -1,7 +1,7 @@
 COLOR ?= always # Valid COLOR options: {always, auto, never}
 CARGO = cargo --color $(COLOR)
 
-.PHONY: all bench build check clean doc install publish run test update
+.PHONY: all bench build check clean doc install run test repl
 
 all: build
 
@@ -20,17 +20,14 @@ clean:
 doc:
 	$(CARGO) doc
 
-install: build
+install:
 	$(CARGO) install
 
-publish:
-	$(CARGO) publish
-
-run: build
+run:
 	$(CARGO) run repl
 
-test: build
+test:
 	RUST_TEST_THREADS=1 $(CARGO) test -- --nocapture
 
-update:
-	$(CARGO) update
+repl:
+	$(CARGO) run client -- repl

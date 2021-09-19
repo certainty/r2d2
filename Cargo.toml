@@ -5,22 +5,38 @@ authors = ["certainty <david.krentzlin@gmail.com>"]
 edition = "2018"
 
 [lib]
-name="r2d2_lib"
+name="r2d2"
 path="src/lib.rs"
 
 [dependencies]
-nom = "4.2.3"
-rustyline = "5.0.1"
-termion = "1.5.1"
-log = "0.4.6"
-env_logger = "0.6.1"
-serde = { version = "1.0.91", features = ["derive"]}
-bincode = "1.1.4"
-clap = "2.33.0"
-itertools = "0.8"
-byteorder = "1.3.1"
-crc = "^1.0.0"
+
+# storage
+serde = { version = "1.0.130", features = ["derive"]}
+bincode = "1.3.3"
+byteorder = "1.4.3"
+crc = "^2.0.0"
+directories = "3.0"
+
+# cli
+clap = "3.0.0-beta.2"
+termion = "1.5.6"
+
+# repl
+rustyline = "8.0.0"
+
+# misc
+itertools = "0.10.1"
+log="0.4"
+env_logger = "0.8"
+pretty_env_logger = "0.4"
+thiserror = "1.0"
+anyhow = "1.0"
 
 [dev-dependencies]
 simulacrum = "0.3.1"
-tempfile = "3.0.8"
+tempfile = "3.2.0"
+matches = "0.1"
+criterion = "0.3.4"
+cargo-criterion = "1.1.0"
+quickcheck = "1"
+quickcheck_macros = "1.0"

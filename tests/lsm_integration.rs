@@ -1,8 +1,6 @@
-extern crate r2d2_lib;
-
 mod utils;
 
-use r2d2_lib::engine::storage::lsm;
+use r2d2::engine::storage::lsm;
 use std::path::Path;
 use utils::*;
 

@@ -14,6 +14,6 @@ RUN cargo build --release
 FROM alpine:latest
 RUN apk --no-cache add ca-certificates
 COPY --from=builder \
-    /home/rust/src/target/x86_64-unknown-linux-musl/release/r2d2_server \
+    /home/rust/src/target/x86_64-unknown-linux-musl/release/server \
     /usr/local/bin/
-CMD /usr/local/bin/r2d2_server
+CMD /usr/local/bin/server

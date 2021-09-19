@@ -72,8 +72,6 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
     match cmd {
         Command::Quit => Output::Break,
 
-        Command::Stats => Output::Message(String::from("Printing statistics")),
-
         Command::Insert(key, value) => {
             match engine.set(Key::from_string(&key), Value::from_string(&value)) {
                 Ok(_) => Output::Message(String::from("OK <>")),
@@ -113,7 +111,6 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
     The following comands are available
 
     :help\t\t\tShow this help
-    :stats\t\t\tShow statistics
     :list_keys\t\t\tList the currently known keys
     :insert <key> <value>\tInsert a new key value pair
     :lookup <key>\t\tFind the value for the given <key>

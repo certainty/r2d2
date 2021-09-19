@@ -1,60 +1,24 @@
 use super::command::Command;
-use nom::types::CompleteStr;
-use nom::*;
+use thiserror::Error;
 
-#[derive(Debug, PartialEq)]
+#[derive(Error, Clone, Debug, PartialEq)]
 pub enum Error {
-    ParsingIncomplete,
+    #[error("Invalid command")]
     ParseError,
 }
+pub type Result<T> = std::result::Result<T, Error>;
 
-named!(cmd_quit<CompleteStr, Command>, map!(tag_s!("quit"), |_| Command::Quit));
+pub fn parse(input: &str) -> Result<Command> {
+    let parts = input.split_whitespace().collect::<Vec<&str>>();
 
-named!(cmd_insert<CompleteStr, Command>, 
-  do_parse!(
-    tag_s!("insert") >>
-    space >>
-    key: alphanumeric >> 
-    space >>
-    value: alphanumeric >>
-    (Command::Insert(key.to_string(), value.to_string()))
-  )
-);
-
-named!(cmd_lookup<CompleteStr, Command>, 
-  do_parse!(
-    tag_s!("lookup") >>
-    space >>
-    key: alphanumeric >>
-    (Command::Lookup(key.to_string()))
-  )
-);
-
-named!(cmd_delete<CompleteStr, Command>, 
-  do_parse!(
-    tag_s!("delete") >>
-    space >>
-    key: alphanumeric >>
-    (Command::Delete(key.to_string()))
-  )
-);
-
-named!(cmd_list_keys<CompleteStr, Command>, map!(tag_s!("list_keys") , |_| Command::ListKeys));
-named!(cmd_stats<CompleteStr, Command>, map!(tag_s!("stats") , |_| Command::Stats));
-named!(cmd_help<CompleteStr, Command>, map!(tag_s!("help") , |_| Command::Help));
-
-named!(pub parse_command<CompleteStr, Command>,
-  do_parse!(
-    tag!(":") >> 
-    cmd: alt_complete!(cmd_quit | cmd_lookup | cmd_delete | cmd_insert | cmd_list_keys | cmd_stats | cmd_help) >> 
-    (cmd))
-);
-
-pub fn parse(input: &str) -> Result<Command, Error> {
-    match parse_command(CompleteStr(input.trim())) {
-        Ok((CompleteStr(""), cmd)) => Result::Ok(cmd),
-        Ok(_) => Result::Err(Error::ParsingIncomplete),
-        Err(_) => Result::Err(Error::ParseError),
+    match parts[..] {
+        [":insert", key, value] => Ok(Command::Insert(key.into(), value.into())),
+        [":lookup", key]  => Ok(Command::Lookup(key.into())),
+        [":delete", key]  => Ok(Command::Delete(key.into())),
+        [":list_keys"] => Ok(Command::ListKeys),
+        [":help"] => Ok(Command::Help),
+        [":quit"] => Ok(Command::Quit),
+        _ => Err(Error::ParseError)
     }
 }
 
@@ -88,13 +52,6 @@ mod tests {
         assert_eq!(parse(&String::from(":insert bar")), Err(Error::ParseError))
     }
 
-    #[test]
-    fn parse_fails_with_appended_garbage() {
-        assert_eq!(
-            parse(&String::from(":insert foo bar garbage")),
-            Err(Error::ParsingIncomplete)
-        )
-    }
 
     #[test]
     fn parse_delete_succeeds() {
@@ -110,14 +67,6 @@ mod tests {
     }
 
     #[test]
-    fn parse_delete_fails_with_appended_garbage() {
-        assert_eq!(
-            parse(&String::from(":delete foo garbagelfdsjlkf")),
-            Err(Error::ParsingIncomplete)
-        )
-    }
-
-    #[test]
     fn parse_lookup_succeeds() {
         assert_eq!(
             parse(&String::from(":lookup foo")),
@@ -128,14 +77,6 @@ mod tests {
     #[test]
     fn parse_lookup_fails_when_key_is_missing() {
         assert_eq!(parse(&String::from(":lookup  ")), Err(Error::ParseError))
-    }
-
-    #[test]
-    fn parse_lookup_fails_with_appended_garbage() {
-        assert_eq!(
-            parse(&String::from(":lookup foo garbagelfdsjlkf")),
-            Err(Error::ParsingIncomplete)
-        )
     }
 
     #[test]
