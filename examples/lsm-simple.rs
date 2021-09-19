@@ -1,7 +1,6 @@
+use r2d2::engine;
+use r2d2::engine::{Engine, Key, Value};
 use std::path::PathBuf;
-extern crate r2d2_lib;
-use r2d2_lib::engine;
-use r2d2_lib::engine::{Engine, Key, Value};
 
 fn main() {
     env_logger::init();

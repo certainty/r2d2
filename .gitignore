@@ -12,3 +12,4 @@ Cargo.lock
 .r2d2_history
 .vscode
 .idea
+*.iml
