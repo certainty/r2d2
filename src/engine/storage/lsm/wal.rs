@@ -10,6 +10,7 @@
 extern crate crc;
 
 use super::binary_io as binio;
+use crate::engine::{Key, Value};
 use log::trace;
 use serde;
 use serde::{Deserialize, Serialize};
@@ -117,11 +118,11 @@ impl FileHeader {
 
 #[derive(Serialize, Deserialize, PartialEq, Debug)]
 /// The operation to persist with the WAL
-pub enum Operation<T> {
+pub enum Operation<K, V> {
     /// Use this to commit a set operation for the provided key-value pair
-    Set(T, T),
+    Set(K, V),
     /// Use this to commit the deletion of the provided key
-    Delete(T),
+    Delete(K),
 }
 
 /// The WalWriter is the main interface you will interact with.
@@ -170,7 +171,7 @@ impl WalWriter {
         })
     }
 
-    pub fn write(&mut self, op: Operation<&[u8]>) -> Result<usize> {
+    pub fn write(&mut self, op: Operation<&Key, &Value>) -> Result<usize> {
         let mut file = self.file.lock()?;
         let size = binio::write_data(&mut *file, op)?;
         file.flush()?;
@@ -206,14 +207,14 @@ impl WalReader {
     ///
     /// Use this to implement you own logic if you can't use the provided Iterator
     /// implementation.
-    pub fn read(&mut self) -> Result<Operation<Vec<u8>>> {
+    pub fn read(&mut self) -> Result<Operation<Key, Value>> {
         let data = binio::read_data_owned(&mut self.file)?;
         Ok(data)
     }
 }
 
 impl Iterator for WalReader {
-    type Item = Result<Operation<Vec<u8>>>;
+    type Item = Result<Operation<Key, Value>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         match self.read() {
@@ -244,7 +245,7 @@ mod tests {
 
         let mut reader = io::Cursor::new(writer.into_inner());
 
-        let op: Operation<Vec<u8>> = binio::read_data_owned(&mut reader).unwrap();
+        let op: Operation<Vec<u8>, Vec<u8>> = binio::read_data_owned(&mut reader).unwrap();
 
         assert_eq!(Operation::Set(foo.to_vec(), bar.to_vec()), op)
     }

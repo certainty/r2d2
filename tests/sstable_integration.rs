@@ -1,24 +1,37 @@
 mod utils;
 
 use r2d2::engine::storage::lsm::sstable;
+use r2d2::engine::{Key, Value};
 use std::path::Path;
+use tempfile::tempdir;
 use utils::*;
 
 #[test]
 fn check_write_sstable() {
-    setup();
-
+    let test_storage_dir = tempdir().unwrap();
     let mut writer =
-        sstable::Writer::create(&Path::new(TEST_STORAGE_DIRECTORY).join("sstable")).unwrap();
+        sstable::Writer::create(&test_storage_dir.path().to_path_buf().join("sstable")).unwrap();
 
-    assert!(writer.append(str_vec("foo"), str_vec("bar")).is_ok());
-    assert!(writer.append(str_vec("bar"), str_vec("baz")).is_ok());
-    assert!(writer.append(str_vec("baz"), str_vec("frooble")).is_ok());
+    assert!(writer
+        .append(&Key::from("foo"), &Value::from("bar"))
+        .is_ok());
+    assert!(writer
+        .append(&Key::from("bar"), &Value::from("baz"))
+        .is_ok());
+    assert!(writer
+        .append(&Key::from("baz"), &Value::from("frooble"))
+        .is_ok());
 
     let slab = writer.seal().unwrap();
     let mut sstable = slab.sstable().unwrap();
 
-    assert_eq!(Some(str_vec("bar")), sstable.get(&str_vec("foo")).unwrap());
-    assert_eq!(Some(str_vec("baz")), sstable.get(&str_vec("bar")).unwrap());
-    assert_eq!(None, sstable.get(&str_vec("foobar")).unwrap());
+    assert_eq!(
+        sstable.get(&Key::from("foo")).unwrap(),
+        Some(Value::from("bar")),
+    );
+    assert_eq!(
+        sstable.get(&Key::from("bar")).unwrap(),
+        Some(Value::from("baz"))
+    );
+    assert_eq!(sstable.get(&Key::from("foobar")).unwrap(), None);
 }

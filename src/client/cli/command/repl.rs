@@ -1,7 +1,6 @@
 use crate::client::repl;
 use crate::engine;
 use clap::Clap;
-use directories;
 use std::path::PathBuf;
 
 #[derive(Clap)]
@@ -12,21 +11,14 @@ pub struct Opts {
 }
 
 pub fn execute(opts: &Opts) -> anyhow::Result<()> {
-    let mut engine = engine::default::new(storage_directory(&opts));
+    let storage_config = if let Some(dir) = &opts.storage_directory {
+        engine::storage::Configuration::new(PathBuf::from(dir))
+    } else {
+        engine::storage::Configuration::new(engine::directories::default_storage_path()?)
+    };
+    let config = engine::configuration::Configuration::new(storage_config);
+
+    let mut engine = engine::Engine::new(config)?;
     repl::run(&mut engine);
     Ok(())
-}
-
-// TODO: move the creation of the directory out of here
-fn storage_directory(opts: &Opts) -> PathBuf {
-    let project_dirs = directories::ProjectDirs::from("de", "lisp-unleashed", "rd2d").unwrap();
-
-    if !project_dirs.data_dir().is_dir() {
-        std::fs::create_dir_all(project_dirs.data_dir()).unwrap();
-    }
-
-    match &opts.storage_directory {
-        Some(dir) => PathBuf::from(dir),
-        None => project_dirs.data_dir().to_path_buf(),
-    }
 }

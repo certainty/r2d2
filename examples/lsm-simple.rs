@@ -1,24 +1,16 @@
 use r2d2::engine;
-use r2d2::engine::{Engine, Key, Value};
+use r2d2::engine::{Engine, Key, Result, Value};
 use std::path::PathBuf;
 
-fn main() {
+fn main() -> Result<()> {
     env_logger::init();
-    let mut engine = engine::default::new(PathBuf::from("/tmp"));
+    let config = engine::configuration::Configuration::new(engine::storage::Configuration::new(
+        PathBuf::from("/tmp"),
+    ));
+    let mut engine = engine::Engine::new(config)?;
+    engine.set("Foo", "this is the value I want to store")?;
+    engine.set("Bar", "some other value")?;
 
-    engine
-        .set(
-            Key::from_string("Foo"),
-            Value::from_string("this is the value I want to store"),
-        )
-        .unwrap();
-
-    engine
-        .set(
-            Key::from_string("Bar"),
-            Value::from_string("some other value"),
-        )
-        .unwrap();
-
-    println!("Value: {:?}", engine.get(&Key::from_string("foo")).unwrap())
+    println!("Value: {:?}", engine.get(&Key::from("foo"))?);
+    Ok(())
 }

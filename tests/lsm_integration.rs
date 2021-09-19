@@ -1,39 +1,48 @@
 mod utils;
-
-use r2d2::engine::storage::lsm;
+use r2d2::engine::storage::{self, lsm};
+use r2d2::engine::{Key, Value};
+use std::error::Error;
 use std::path::Path;
+use tempfile::{tempdir, TempDir};
 use utils::*;
 
 #[test]
-fn check_lsm_works() {
-    setup();
-    let mut lsm = lsm::init(Path::new(TEST_STORAGE_DIRECTORY)).unwrap();
-    let foo = str_vec("foo");
-    let bar = str_vec("bar");
+fn check_lsm_works() -> Result<(), storage::lsm::Error> {
+    let test_storage_dir = tempdir()?;
+    let mut lsm = lsm::LSM::new(storage::Configuration::new(
+        test_storage_dir.path().to_path_buf(),
+    ))?;
+    let foo = Key::from("foo");
+    let bar = Value::from("bar");
 
-    assert!(lsm.get(&foo).unwrap().is_none());
+    assert!(lsm.get(&foo)?.is_none());
     assert!(lsm.set(foo.clone(), bar.clone()).is_ok());
-    assert_eq!(Some(&bar.clone()), lsm.get(&foo).unwrap());
+    assert_eq!(Some(&bar.clone()), lsm.get(&foo)?);
+
+    Ok(())
 }
 
 #[test]
-fn check_recovery_from_commit_log() {
-    setup();
-    let foo = str_vec("foo");
-    let bar = str_vec("bar");
-    let baz = str_vec("baz");
+fn check_recovery_from_commit_log() -> Result<(), storage::lsm::Error> {
+    let test_storage_dir = tempdir()?;
+    let config = storage::Configuration::new(test_storage_dir.path().to_path_buf());
+
+    let foo = Key::from("foo");
+    let bar = Key::from("bar");
+    let baz = Value::from("baz");
 
     {
-        let mut lsm = lsm::init(Path::new(TEST_STORAGE_DIRECTORY)).unwrap();
+        let mut lsm = lsm::LSM::new(config.clone())?;
 
-        assert!(lsm.set(foo.clone(), bar.clone()).is_ok());
+        assert!(lsm.set(foo.clone(), baz.clone()).is_ok());
         assert!(lsm.set(bar.clone(), baz.clone()).is_ok());
     }
 
     // now open a new LSM that recreates the state from the commit log
-    let lsm = lsm::init(Path::new(TEST_STORAGE_DIRECTORY)).unwrap();
+    let mut lsm = lsm::LSM::new(config)?;
 
     // keys should be there now
-    assert_eq!(Some(&bar.clone()), lsm.get(&foo).unwrap());
-    assert_eq!(Some(&baz.clone()), lsm.get(&bar).unwrap());
+    assert_eq!(Some(&baz.clone()), lsm.get(&foo)?);
+    assert_eq!(Some(&baz.clone()), lsm.get(&bar)?);
+    Ok(())
 }

@@ -27,7 +27,7 @@ run:
 	$(CARGO) run repl
 
 test:
-	RUST_TEST_THREADS=1 $(CARGO) test -- --nocapture
+	$(CARGO) test -- --nocapture
 
 repl:
 	$(CARGO) run client -- repl

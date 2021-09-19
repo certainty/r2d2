@@ -21,8 +21,3 @@ pub fn setup() {
         fs::create_dir_all(&path).unwrap();
     }
 }
-
-#[cfg(test)]
-pub fn str_vec(s: &str) -> Vec<u8> {
-    s.as_bytes().to_vec()
-}
