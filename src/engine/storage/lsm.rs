@@ -17,6 +17,7 @@ use log::info;
 mod binary_io;
 pub mod sstable;
 pub mod wal;
+use crate::engine::{Key, Value};
 use thiserror::Error;
 
 type Result<T> = result::Result<T, Error>;
@@ -29,7 +30,7 @@ pub enum Error {
     IoError(#[from] std::io::Error),
 }
 
-type Memtable = BTreeMap<Vec<u8>, Vec<u8>>;
+type Memtable = BTreeMap<Key, Value>;
 
 pub struct LSM {
     wal: wal::WalWriter,
@@ -98,21 +99,21 @@ fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
 }
 
 impl LSM {
-    pub fn set(&mut self, k: Vec<u8>, v: Vec<u8>) -> Result<Option<Vec<u8>>> {
+    pub fn set(&mut self, k: Key, v: Value) -> Result<Option<Value>> {
         self.wal.write(wal::Operation::Set(&k, &v))?;
         Ok(self.memtable.insert(k, v))
     }
 
-    pub fn del(&mut self, k: &Vec<u8>) -> Result<Option<Vec<u8>>> {
+    pub fn del(&mut self, k: &Key) -> Result<Option<Value>> {
         self.wal.write(wal::Operation::Delete(k))?;
         Ok(self.memtable.remove(k))
     }
 
-    pub fn get(&self, k: &Vec<u8>) -> Result<Option<&Vec<u8>>> {
+    pub fn get(&self, k: &Key) -> Result<Option<&Value>> {
         Ok(self.memtable.get(k))
     }
 
-    pub fn keys(&self) -> Result<Vec<&Vec<u8>>> {
+    pub fn keys(&self) -> Result<Vec<&Key>> {
         Ok(self.memtable.keys().collect())
     }
 }

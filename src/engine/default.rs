@@ -10,8 +10,9 @@ use std::fs;
 use std::path::PathBuf;
 
 use super::storage::lsm;
-use super::Error as EngineError;
+use super::Result;
 use super::{Engine, Key, Value};
+use std::fmt::Debug;
 
 pub struct DefaultEngine {
     lsm: lsm::LSM,
@@ -25,30 +26,30 @@ pub fn new(storage_directory: PathBuf) -> DefaultEngine {
 }
 
 impl Engine for DefaultEngine {
-    fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>, EngineError> {
+    fn set<K: Into<Key> + Debug, V: Into<Value> + Debug>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Result<Option<Value>> {
         trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
 
-        let previous = self.lsm.set(key.data, value.data)?;
-        Ok(previous.map(|i| Value::new(i)))
+        Ok(self.lsm.set(key.into(), value.into())?)
     }
 
-    fn del(&mut self, key: &Key) -> Result<Option<Value>, EngineError> {
+    fn del(&mut self, key: &Key) -> Result<Option<Value>> {
         trace!(target: "engine", "Delete {:?}", key);
 
-        let previous = self.lsm.del(&key.data)?;
-        Ok(previous.map(|v| Value::new(v)))
+        Ok(self.lsm.del(&key)?)
     }
 
-    fn get(&self, key: &Key) -> Result<Option<Value>, EngineError> {
+    fn get(&self, key: &Key) -> Result<Option<Value>> {
         trace!(target: "engine", "Lookup {:?}", key);
 
-        let value = self.lsm.get(&key.data)?;
-        // TODO: do we really want to copy here?
-        Ok(value.map(|v| Value::new(v.clone())))
+        Ok(self.lsm.get(&key)?.cloned())
     }
 
     // TODO: maybe we should implement an iterator instead to make it more efficient
-    fn keys(&self) -> Result<Vec<Key>, EngineError> {
+    fn keys(&self) -> Result<Vec<Key>> {
         trace!(target: "engine", "List keys");
         let byte_keys = self.lsm.keys()?;
         let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();

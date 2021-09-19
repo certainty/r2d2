@@ -10,65 +10,17 @@
 /// It presents itself with a dictionary-like interfacer where each operation
 /// might fail. This is deliberate since every operation has to potentially interact
 /// with the OS or the network which are unreliable components.
-use std::ops::Deref;
 use thiserror::Error;
 
 pub mod default;
+pub mod key;
 pub mod storage;
+pub mod value;
 
-// A key is an arbitray sequence of bytes
-// For concenience there are conversions from String and to Vec<u8>
-#[derive(Debug, PartialEq)]
-#[repr(transparent)]
-pub struct Key {
-    pub data: Vec<u8>,
-}
-
-impl Key {
-    pub fn new(data: Vec<u8>) -> Key {
-        Key { data }
-    }
-
-    pub fn from_string(s: &str) -> Key {
-        Key {
-            data: s.as_bytes().to_vec(),
-        }
-    }
-}
-
-impl Deref for Key {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-#[derive(Debug, PartialEq)]
-#[repr(transparent)]
-pub struct Value {
-    pub data: Vec<u8>,
-}
-
-impl Deref for Value {
-    type Target = Vec<u8>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
-}
-
-impl Value {
-    pub fn new(data: Vec<u8>) -> Value {
-        Value { data }
-    }
-
-    pub fn from_string(s: &str) -> Value {
-        Value {
-            data: s.as_bytes().to_vec(),
-        }
-    }
-}
+// re-exports for convenience
+pub use key::Key;
+use std::fmt::Debug;
+pub use value::Value;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -84,7 +36,11 @@ pub trait Engine {
     // when this function returns successfully, the following guarantees hold:
     // * the change is durable on the local node.
     // * a local lookup will return the inserted value (unless there was an update in between)
-    fn set(&mut self, key: Key, value: Value) -> Result<Option<Value>>;
+    fn set<K: Into<Key> + Debug, V: Into<Value> + Debug>(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Result<Option<Value>>;
 
     // Delete a key from the store
     //

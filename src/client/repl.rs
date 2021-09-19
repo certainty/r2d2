@@ -4,17 +4,16 @@
 //! them with the currently active engine. This is intdended to be used for debug
 //! purposes only.
 
-extern crate itertools;
 extern crate rustyline;
-use crate::engine::{Engine, Key, Value};
+use crate::engine::{Engine, Key};
 
 mod command;
 mod command_parser;
 
 use command::Command;
-use itertools::Itertools;
 use rustyline::error::ReadlineError;
 use rustyline::Editor;
+use std::convert::TryInto;
 use std::result::Result;
 use termion::color;
 
@@ -29,6 +28,16 @@ enum Output {
     Break,
     Error(String),
     Message(String),
+}
+
+impl Output {
+    pub fn message<M: Into<String>>(m: M) -> Output {
+        Output::Message(m.into())
+    }
+
+    pub fn error<M: Into<String>>(m: M) -> Output {
+        Output::Error(m.into())
+    }
 }
 
 // TODO: add completer for commands
@@ -72,41 +81,40 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
     match cmd {
         Command::Quit => Output::Break,
 
-        Command::Insert(key, value) => {
-            match engine.set(Key::from_string(&key), Value::from_string(&value)) {
-                Ok(_) => Output::Message(String::from("OK <>")),
-                Err(msg) => Output::Error(format!("{:?}", msg)),
-            }
-        }
-
-        Command::Delete(key) => match engine.del(&Key::from_string(&key)) {
-            Ok(Some(value)) => {
-                Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap()))
-            }
-            Ok(None) => Output::Message(String::from("OK <>")),
-            Err(msg) => Output::Error(format!("{:?}", msg)),
+        Command::Insert(key, value) => match engine.set(key, value) {
+            Ok(_) => Output::message("OK <>"),
+            Err(msg) => Output::error(format!("{:?}", msg)),
         },
 
-        Command::Lookup(key) => match engine.get(&Key::from_string(&key)) {
+        Command::Delete(key) => match engine.del(&Key::from(key)) {
             Ok(Some(value)) => {
-                Output::Message(format!("OK <{}>", String::from_utf8(value.data).unwrap()))
+                let string_value: String = value.try_into().unwrap();
+                Output::message(format!("OK <{}>", string_value))
             }
-            Ok(None) => Output::Message(String::from("OK <>")),
-            Err(msg) => Output::Error(format!("{:?}", msg)),
+            Ok(None) => Output::message("OK <>"),
+            Err(msg) => Output::error(format!("{:?}", msg)),
+        },
+
+        Command::Lookup(key) => match engine.get(&Key::from(key)) {
+            Ok(Some(value)) => Output::Message(format!(
+                "OK <{}>",
+                String::from_utf8(value.to_vec()).unwrap()
+            )),
+            Ok(None) => Output::message("OK <>"),
+            Err(msg) => Output::error(format!("{:?}", msg)),
         },
 
         Command::ListKeys => match engine.keys() {
-            Ok(keys) => Output::Message(format!(
-                "OK <{}>",
-                keys.iter()
-                    .map(|k| std::str::from_utf8(&k.data).unwrap())
-                    .join(", ")
-            )),
+            Ok(keys) => {
+                let string_keys: Result<Vec<String>, _> =
+                    keys.iter().map(TryInto::try_into).collect();
+                Output::Message(format!("OK <{}>", string_keys.unwrap().join(", ")))
+            }
 
-            Err(msg) => Output::Error(format!("{:?}", msg)),
+            Err(msg) => Output::error(format!("{:?}", msg)),
         },
 
-        Command::Help => Output::Message(String::from(
+        Command::Help => Output::message(
             "
     The following comands are available
 
@@ -117,7 +125,7 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
     :delete <key>\t\tDelete a key that has been previously inserted
     :quit\t\t\tExit the repl
     ",
-        )),
+        ),
     }
 }
 

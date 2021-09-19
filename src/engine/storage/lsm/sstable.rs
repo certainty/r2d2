@@ -11,6 +11,7 @@
 //! merge intermediate tables together.
 //!
 use super::binary_io as binio;
+use crate::engine::{Key, Value};
 use log::{info, trace};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -21,8 +22,6 @@ use std::io::{Seek, SeekFrom, Write};
 use std::path;
 use thiserror::Error;
 
-type Key = Vec<u8>;
-type Value = Vec<u8>;
 type Offset = usize;
 type Level = u8;
 type Result<T> = std::result::Result<T, Error>;
@@ -175,11 +174,11 @@ impl Writer {
     /// Append a new key value pair to the SSTable
     ///
     /// The caller _must_ make that keys are added in _ascending_ order.
-    pub fn append(&mut self, k: Key, v: Value) -> Result<()> {
+    pub fn append(&mut self, k: &Key, v: &Value) -> Result<()> {
         trace!("append key {:?} offset: {}", k, self.data_bytes_written);
 
         self.data_bytes_written += binio::write_data(&mut self.file, &k)?;
-        self.index.push((k, self.data_bytes_written));
+        self.index.push((k.clone(), self.data_bytes_written));
 
         trace!("append value offset: {}", self.data_bytes_written);
 
@@ -219,8 +218,8 @@ impl Writer {
         Ok(Slab {
             level: 0,
             path: self.path.to_owned(),
-            min_key: min_key.to_vec(),
-            max_key: max_key.to_vec(),
+            min_key: min_key.clone(),
+            max_key: max_key.clone(),
         })
     }
 
@@ -359,6 +358,7 @@ struct Meta {
 #[cfg(test)]
 mod tests {
     use super::Slab;
+    use crate::engine::Key;
     use std::path;
 
     #[test]
@@ -366,14 +366,15 @@ mod tests {
         let slab = Slab::new(
             0,
             path::Path::new("/tmp"),
-            "alpha".as_bytes().to_vec(),
-            "gamma".as_bytes().to_vec(),
+            Key::from("alpha"),
+            Key::from("gamma"),
         );
 
-        assert!(slab.covers(&"alpha".as_bytes().to_vec()));
-        assert!(slab.covers(&"beta".as_bytes().to_vec()));
-        assert!(!slab.covers(&"iota".as_bytes().to_vec()));
-        assert!(slab.covers(&"gamma".as_bytes().to_vec()));
-        assert!(!slab.covers(&"gammb".as_bytes().to_vec()));
+        for k in ["alpha", "beta", "gamma"] {
+            assert!(slab.covers(&Key::from(k)), "expected slab to cover {}", k);
+        }
+
+        assert!(!slab.covers(&Key::from("gammb")));
+        assert!(!slab.covers(&Key::from("iota")));
     }
 }
