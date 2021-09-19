@@ -13,11 +13,11 @@ It is currently for educational purposes only to:
 ## Run the repl to interact with the store
 
 ```
-cargo run --bin r2d2 repl
+make repl
 ```
 
 ## Run the tests
 
 ```
-RUST_TEST_THREADS=1 cargo test -- --nocapture
+make test
 ```
