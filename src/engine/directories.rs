@@ -1,3 +1,4 @@
+use crate::engine::configuration::Configuration;
 use directories;
 use directories::ProjectDirs;
 use std::path::PathBuf;
@@ -5,19 +6,19 @@ use thiserror::Error;
 
 type Result<T> = std::result::Result<T, Error>;
 
-#[derive(Error)]
+#[derive(Error, Debug)]
 pub enum Error {
     #[error("System doesn't have project directories")]
     MissingProjectDirectory,
     #[error("Could not initialise paths")]
     PathSetupError,
+    #[error(transparent)]
+    IoError(#[from] std::io::Error),
 }
 
-pub fn setup_directories() -> Result<()> {
-    let project_dirs = project_directories()?;
-
-    if !project_dirs.data_dir().is_dir() {
-        std::fs::create_dir_all(project_dirs.data_dir()).unwrap();
+pub fn setup_directories(config: &Configuration) -> Result<()> {
+    if !config.storage.storage_path.is_dir() {
+        std::fs::create_dir_all(&config.storage.storage_path)?;
     }
     Ok(())
 }

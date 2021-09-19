@@ -3,14 +3,14 @@ mod utils;
 use r2d2::engine::storage::lsm::sstable;
 use r2d2::engine::{Key, Value};
 use std::path::Path;
+use tempfile::tempdir;
 use utils::*;
 
 #[test]
 fn check_write_sstable() {
-    setup();
-
+    let test_storage_dir = tempdir().unwrap();
     let mut writer =
-        sstable::Writer::create(&Path::new(TEST_STORAGE_DIRECTORY).join("sstable")).unwrap();
+        sstable::Writer::create(&test_storage_dir.path().to_path_buf().join("sstable")).unwrap();
 
     assert!(writer
         .append(&Key::from("foo"), &Value::from("bar"))

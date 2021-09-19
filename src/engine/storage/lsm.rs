@@ -9,7 +9,6 @@
 //! threads.
 
 use std::collections::BTreeMap;
-use std::path::Path;
 use std::result;
 
 use super::Configuration;
@@ -76,7 +75,7 @@ impl LSM {
             memtable,
         };
 
-        recover(&mut lsm_for_repair, &wal)?;
+        Self::recover(&mut lsm_for_repair, &wal)?;
         info!(target: "LSM", "recovery completed successfully");
 
         Ok(LSM {

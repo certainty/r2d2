@@ -40,8 +40,7 @@ impl Output {
     }
 }
 
-// TODO: add completer for commands
-pub fn run(engine: &mut impl Engine) {
+pub fn run(engine: &mut Engine) {
     let mut editor = Editor::<()>::new();
     editor.load_history(HISTORY_FILE).ok();
     println!("r2d2 repl :: use :help to get help and :quit to exit");
@@ -77,7 +76,7 @@ fn read(editor: &mut Editor<()>) -> Result<Input, String> {
     }
 }
 
-fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
+fn eval(cmd: Command, engine: &mut Engine) -> Output {
     match cmd {
         Command::Quit => Output::Break,
 

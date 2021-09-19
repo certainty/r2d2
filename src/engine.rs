@@ -23,7 +23,6 @@ use log::*;
 use crate::engine::configuration::Configuration;
 pub use key::Key;
 use std::fmt::Debug;
-use std::path::PathBuf;
 pub use value::Value;
 
 #[derive(Error, Debug)]
@@ -31,7 +30,7 @@ pub enum Error {
     #[error(transparent)]
     StorageError(#[from] storage::lsm::Error),
     #[error(transparent)]
-    ConfigError(#[from] configuration::Error),
+    FileSystemError(#[from] directories::Error),
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
@@ -42,12 +41,9 @@ pub struct Engine {
 
 impl Engine {
     pub fn new(config: Configuration) -> Result<Self> {
+        directories::setup_directories(&config)?;
         let lsm = storage::lsm::LSM::new(config.storage)?;
         Ok(Self { lsm })
-    }
-
-    pub fn default() -> Result<Engine> {
-        Self::new(storage::Configuration::default()?)
     }
 
     /// Insert a key value pair into the store
@@ -55,7 +51,7 @@ impl Engine {
     /// when this function returns successfully, the following guarantees hold:
     /// * the change is durable on the local node.
     /// * a local lookup will return the inserted value (unless there was an update in between)
-    fn set<K: Into<Key> + Debug, V: Into<Value> + Debug>(
+    pub fn set<K: Into<Key> + Debug, V: Into<Value> + Debug>(
         &mut self,
         key: K,
         value: V,
@@ -73,7 +69,7 @@ impl Engine {
     /// If the function returns successfully, the following guarantees hold:
     /// * the change is durable on the local node.
     /// * the key/value can not be found anymore (unless it has been re-inserted)
-    fn del(&mut self, key: &Key) -> Result<Option<Value>> {
+    pub fn del(&mut self, key: &Key) -> Result<Option<Value>> {
         trace!(target: "engine", "Delete {:?}", key);
         Ok(self.lsm.del(&key)?)
     }
@@ -83,12 +79,12 @@ impl Engine {
     /// Find a value for the given key if it exists.
     /// This operation might fail, e.g. when implementatons need to access the
     /// filesystem or the network.
-    fn get(&self, key: &Key) -> Result<Option<&Value>> {
+    pub fn get(&self, key: &Key) -> Result<Option<&Value>> {
         trace!(target: "engine", "Lookup {:?}", key);
         Ok(self.lsm.get(&key)?)
     }
 
-    fn iter(&self) -> EngineIterator {
+    pub fn iter(&self) -> EngineIterator {
         self.lsm.iter()
     }
 }
