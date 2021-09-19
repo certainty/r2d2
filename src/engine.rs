@@ -58,11 +58,25 @@ pub trait Engine {
     // Find a value for the given key if it exists.
     // This operation might fail, e.g. when implementatons need to access the
     // filesystem or the network.
-    fn get(&self, key: &Key) -> Result<Option<Value>>;
+    fn get(&self, key: &Key) -> Result<Option<&Value>>;
 
-    // List all the currently stored keys
-    //
-    // This is purely for debug reasons as in any real system the amount of keys
-    // might grow way too large to return them all in a vector.
-    fn keys(&self) -> Result<Vec<Key>>;
+    fn iter(&self) -> EngineIterator;
+}
+
+pub struct EngineIterator<'a> {
+    iter: storage::lsm::Iter<'a>,
+}
+
+impl<'a> EngineIterator<'a> {
+    pub fn new(iter: storage::lsm::Iter<'a>) -> Self {
+        Self { iter }
+    }
+}
+
+impl<'a> Iterator for EngineIterator<'a> {
+    type Item = (&'a Key, &'a Value);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter.next()
+    }
 }

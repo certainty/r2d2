@@ -104,15 +104,11 @@ fn eval(cmd: Command, engine: &mut impl Engine) -> Output {
             Err(msg) => Output::error(format!("{:?}", msg)),
         },
 
-        Command::ListKeys => match engine.keys() {
-            Ok(keys) => {
-                let string_keys: Result<Vec<String>, _> =
-                    keys.iter().map(TryInto::try_into).collect();
-                Output::Message(format!("OK <{}>", string_keys.unwrap().join(", ")))
-            }
-
-            Err(msg) => Output::error(format!("{:?}", msg)),
-        },
+        Command::ListKeys => {
+            let string_keys: Result<Vec<String>, _> =
+                engine.iter().map(|(k, _v)| TryInto::try_into(k)).collect();
+            Output::Message(format!("OK <{}>", string_keys.unwrap().join(", ")))
+        }
 
         Command::Help => Output::message(
             "

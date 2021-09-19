@@ -17,7 +17,7 @@ use log::info;
 mod binary_io;
 pub mod sstable;
 pub mod wal;
-use crate::engine::{Key, Value};
+use crate::engine::{EngineIterator, Key, Value};
 use thiserror::Error;
 
 type Result<T> = result::Result<T, Error>;
@@ -31,6 +31,7 @@ pub enum Error {
 }
 
 type Memtable = BTreeMap<Key, Value>;
+pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
 
 pub struct LSM {
     wal: wal::WalWriter,
@@ -113,7 +114,7 @@ impl LSM {
         Ok(self.memtable.get(k))
     }
 
-    pub fn keys(&self) -> Result<Vec<&Key>> {
-        Ok(self.memtable.keys().collect())
+    pub fn iter(&self) -> EngineIterator {
+        EngineIterator::new(self.memtable.iter())
     }
 }

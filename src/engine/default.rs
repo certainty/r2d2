@@ -12,6 +12,7 @@ use std::path::PathBuf;
 use super::storage::lsm;
 use super::Result;
 use super::{Engine, Key, Value};
+use crate::engine::EngineIterator;
 use std::fmt::Debug;
 
 pub struct DefaultEngine {
@@ -42,17 +43,13 @@ impl Engine for DefaultEngine {
         Ok(self.lsm.del(&key)?)
     }
 
-    fn get(&self, key: &Key) -> Result<Option<Value>> {
+    fn get(&self, key: &Key) -> Result<Option<&Value>> {
         trace!(target: "engine", "Lookup {:?}", key);
 
-        Ok(self.lsm.get(&key)?.cloned())
+        Ok(self.lsm.get(&key)?)
     }
 
-    // TODO: maybe we should implement an iterator instead to make it more efficient
-    fn keys(&self) -> Result<Vec<Key>> {
-        trace!(target: "engine", "List keys");
-        let byte_keys = self.lsm.keys()?;
-        let keys = byte_keys.iter().map(|k| Key::new(k.to_vec())).collect();
-        Ok(keys)
+    fn iter(&self) -> EngineIterator {
+        self.lsm.iter()
     }
 }
