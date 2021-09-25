@@ -50,6 +50,21 @@ where
     write_frame(w, &serialized)
 }
 
+pub fn read_data<'a, R, D>(r: &'a mut R, buf: &'a mut Vec<u8>) -> Result<D>
+where
+    R: io::Read,
+    D: serde::de::Deserialize<'a>,
+{
+    let frame_size = read_frame(r, buf)?;
+    trace!("read data frame successfully. size: {} bytes", frame_size);
+
+    let value = bincode::deserialize(buf.as_slice()).map_err(|e| {
+        error!("deserialization of data frame failed: {:?}", e.as_ref());
+        Error::SerializationError
+    })?;
+    Ok(value)
+}
+
 pub fn read_data_owned<R, D>(r: &mut R) -> Result<D>
 where
     R: io::Read,

@@ -30,10 +30,9 @@ impl WalReader {
         })
     }
 
-    /// Reads the next comitted operation from the WAL
+    /// Reads the next committed operation from the WAL
     ///
     /// Use this to implement you own logic if you can't use the provided Iterator implementation.
-    /// TODO: shouldn't that be borrowed?
     pub fn read(&mut self) -> Result<Operation<Key, Value>> {
         let data = binio::read_data_owned(&mut self.file)?;
         Ok(data)
