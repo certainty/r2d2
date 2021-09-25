@@ -11,6 +11,7 @@ This is why links also mention references to sorted string table operations
 
 * https://en.wikipedia.org/wiki/Log-structured_merge-tree
 * https://arxiv.org/pdf/1812.07527.pdf
+* https://www.igvita.com/2012/02/06/sstable-and-log-structured-storage-leveldb/
 
 ### 2. Efficient replication using CURP
 Once the local storage layer is in place I want to try to work out replication accross multiple nodes. 
