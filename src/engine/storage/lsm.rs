@@ -1,26 +1,27 @@
-//! The LSM implements a log structured merge tree
-//!
-//! Docs: https://en.wikipedia.org/wiki/Log-structured_merge-tree
-//!
-//! The module exposes a struct that can be used to construct
-//! an LSM by providing appropriate implementations for the underlying
-//! components. The architecture will take care of all aspects
-//! related to the management of the local LSM. It might spawn additional
-//! threads.
-
+/// The LSM implements a log structured merge tree using SSTables as C1
+///
+/// Docs: https://en.wikipedia.org/wiki/Log-structured_merge-tree/
+///
+/// The module exposes a struct that can be used to construct
+/// an LSM by providing appropriate implementations for the underlying
+/// components. The architecture will take care of all aspects
+/// related to the management of the local LSM. It might spawn additional
+/// threads.
 use std::collections::BTreeMap;
-use std::result;
 
-use super::Configuration;
-use crate::engine::{EngineIterator, Key, Value};
-use log::info;
+use log;
 use thiserror::Error;
 
-mod binary_io;
+use configuration::Configuration;
+
+use crate::engine::{EngineIterator, Key, Value};
+
+pub mod binary_io;
+pub mod configuration;
 pub mod sstable;
 pub mod wal;
 
-type Result<T> = result::Result<T, Error>;
+type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
@@ -30,14 +31,23 @@ pub enum Error {
     IoError(#[from] std::io::Error),
 }
 
-type Memtable = BTreeMap<Key, Value>;
-pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
-
+/// The LSM implementation is comprised of some classical components.
+/// It uses a write-ahead-log (WAL) to make operations durable on the local node.
+/// It uses an in memory index / table to have a fast C0 system for key-value pairs
+/// It uses SSTables in the C1 system to allow relatively fast look-up and very fast
+/// (io-optmized) disc access for huge amounts of data.
 pub struct LSM {
     config: Configuration,
     wal: wal::WalWriter,
     memtable: Memtable,
 }
+
+/// The memtable is the fast C0 system in the LSM.
+/// It has two main properties:
+/// 1. fast key based operations (lookup and insertion)
+/// 2. sorted iteration over keys (to dump to SSTables)
+type Memtable = BTreeMap<Key, Value>;
+pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
 
 impl LSM {
     pub fn new(config: Configuration) -> Result<LSM> {
@@ -49,14 +59,14 @@ impl LSM {
             Self::init_clean(config, &wal)
         };
 
-        info!(target: "LSM","lsm subsystem initialized and ready");
+        log::info!(target: "LSM","lsm subsystem initialized and ready");
         lsm
     }
 
     fn init_clean(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
         let memtable = Memtable::new();
 
-        info!(target: "LSM", "starting lsm with fresh commit log",);
+        log::info!(target: "LSM", "starting lsm with fresh commit log",);
 
         Ok(LSM {
             config,
@@ -66,7 +76,7 @@ impl LSM {
     }
 
     fn init_with_recovery(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
-        info!(target: "LSM", "starting recovery from WAL");
+        log::info!(target: "LSM", "starting recovery from WAL");
 
         let memtable = Memtable::new();
         let mut lsm_for_repair = LSM {
@@ -76,7 +86,7 @@ impl LSM {
         };
 
         Self::recover(&mut lsm_for_repair, &wal)?;
-        info!(target: "LSM", "recovery completed successfully");
+        log::info!(target: "LSM", "recovery completed successfully");
 
         Ok(LSM {
             wal: wal.resume()?,

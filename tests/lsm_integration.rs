@@ -1,17 +1,14 @@
-mod utils;
 use r2d2::engine::storage::{self, lsm};
 use r2d2::engine::{Key, Value};
-use std::error::Error;
-use std::path::Path;
-use tempfile::{tempdir, TempDir};
-use utils::*;
+use tempfile::tempdir;
 
 #[test]
-fn check_lsm_works() -> Result<(), storage::lsm::Error> {
-    let test_storage_dir = tempdir()?;
-    let mut lsm = lsm::LSM::new(storage::Configuration::new(
-        test_storage_dir.path().to_path_buf(),
-    ))?;
+fn check_lsm_works() -> anyhow::Result<()> {
+    let mut config_builder = storage::lsm::configuration::Builder::default();
+    config_builder.with_storage_path(tempdir()?.path().to_path_buf())?;
+    let config = config_builder.build()?;
+    let mut lsm = lsm::LSM::new(config)?;
+
     let foo = Key::from("foo");
     let bar = Value::from("bar");
 
@@ -23,9 +20,10 @@ fn check_lsm_works() -> Result<(), storage::lsm::Error> {
 }
 
 #[test]
-fn check_recovery_from_commit_log() -> Result<(), storage::lsm::Error> {
-    let test_storage_dir = tempdir()?;
-    let config = storage::Configuration::new(test_storage_dir.path().to_path_buf());
+fn check_recovery_from_commit_log() -> anyhow::Result<()> {
+    let mut config_builder = storage::lsm::configuration::Builder::default();
+    config_builder.with_storage_path(tempdir()?.path().to_path_buf())?;
+    let config = config_builder.build()?;
 
     let foo = Key::from("foo");
     let bar = Key::from("bar");
@@ -39,7 +37,7 @@ fn check_recovery_from_commit_log() -> Result<(), storage::lsm::Error> {
     }
 
     // now open a new LSM that recreates the state from the commit log
-    let mut lsm = lsm::LSM::new(config)?;
+    let lsm = lsm::LSM::new(config)?;
 
     // keys should be there now
     assert_eq!(Some(&baz.clone()), lsm.get(&foo)?);

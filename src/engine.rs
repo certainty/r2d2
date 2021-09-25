@@ -1,5 +1,7 @@
-/// The engine is the main abstraction that you use
-/// to interact with the key-value store system.
+use std::fmt::Debug;
+
+use log::*;
+/// The engine is the main abstraction to interact with the key-value store system.
 ///
 /// The engine owns all key-value pairs and takes care of
 /// interacting with them, delegating storage to its subsystem.
@@ -7,33 +9,37 @@
 /// It maintains the local state as well as providing
 /// the necessary data transfer to update the cluster state if required.
 ///
-/// It presents itself with a dictionary-like interfacer where each operation
+/// It presents itself with a dictionary-like interface where each operation
 /// might fail. This is deliberate since every operation has to potentially interact
 /// with the OS or the network which are unreliable components.
 use thiserror::Error;
+
+// re-exports for convenience
+pub use key::Key;
+pub use value::Value;
+
+use crate::engine::configuration::Configuration;
 
 pub mod configuration;
 pub mod directories;
 pub mod key;
 pub mod storage;
 pub mod value;
-use log::*;
 
-// re-exports for convenience
-use crate::engine::configuration::Configuration;
-pub use key::Key;
-use std::fmt::Debug;
-pub use value::Value;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error(transparent)]
+    ConfigurationError(#[from] configuration::Error),
+    #[error(transparent)]
+    StorageConfigurationError(#[from] storage::lsm::configuration::Error),
+
     #[error(transparent)]
     StorageError(#[from] storage::lsm::Error),
     #[error(transparent)]
     FileSystemError(#[from] directories::Error),
 }
-
-pub type Result<T> = std::result::Result<T, Error>;
 
 pub struct Engine {
     lsm: storage::lsm::LSM,

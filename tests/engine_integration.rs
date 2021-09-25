@@ -1,17 +1,14 @@
-mod utils;
 use r2d2::engine;
-use r2d2::engine::storage;
-use r2d2::engine::{Engine, Key, Result, Value};
-use std::path::PathBuf;
+use r2d2::engine::{Key, Value};
 use tempfile::tempdir;
-use utils::*;
 
 #[test]
-fn basic_operation_works() -> Result<()> {
-    let test_storage_dir = tempdir().unwrap();
-    let config = engine::configuration::Configuration::new(storage::Configuration::new(
-        test_storage_dir.path().to_path_buf(),
-    ));
+fn basic_operation_works() -> anyhow::Result<()> {
+    let mut config_builder = engine::configuration::Builder::default();
+    config_builder
+        .storage
+        .with_storage_path(tempdir()?.path().to_path_buf())?;
+    let config = config_builder.build()?;
     let mut ngin = engine::Engine::new(config)?;
 
     assert_eq!(ngin.get(&Key::from("foo"))?, None);
