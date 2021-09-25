@@ -12,7 +12,7 @@ pub struct Opts {
 
 pub fn execute(opts: &Opts) -> anyhow::Result<()> {
     let config = configure(opts)?;
-    let mut engine = Engine::new(config)?;
+    let mut engine = Engine::start(config)?;
     repl::run(&mut engine);
     Ok(())
 }

@@ -9,7 +9,7 @@ fn basic_operation_works() -> anyhow::Result<()> {
         .storage
         .with_storage_path(tempdir()?.path().to_path_buf())?;
     let config = config_builder.build()?;
-    let mut ngin = engine::Engine::new(config)?;
+    let mut ngin = engine::Engine::start(config)?;
 
     assert_eq!(ngin.get(&Key::from("foo"))?, None);
 

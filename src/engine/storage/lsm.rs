@@ -1,3 +1,4 @@
+use crate::engine::storage::lsm::wal::writer::WalWriter;
 /// The LSM implements a log structured merge tree using SSTables as C1
 ///
 /// Docs: https://en.wikipedia.org/wiki/Log-structured_merge-tree/
@@ -7,14 +8,11 @@
 /// components. The architecture will take care of all aspects
 /// related to the management of the local LSM. It might spawn additional
 /// threads.
-use std::collections::BTreeMap;
-
-use log;
-use thiserror::Error;
-
-use configuration::Configuration;
-
 use crate::engine::{EngineIterator, Key, Value};
+use configuration::Configuration;
+use log;
+use std::collections::BTreeMap;
+use thiserror::Error;
 
 pub mod binary_io;
 pub mod configuration;
@@ -38,7 +36,7 @@ pub enum Error {
 /// (io-optmized) disc access for huge amounts of data.
 pub struct LSM {
     config: Configuration,
-    wal: wal::WalWriter,
+    wal: WalWriter,
     memtable: Memtable,
 }
 
@@ -51,7 +49,7 @@ pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
 
 impl LSM {
     pub fn new(config: Configuration) -> Result<LSM> {
-        let wal = wal::init(&config.storage_path)?;
+        let wal = wal::WalManager::init(&config.storage_path)?;
 
         let lsm = if wal.recovery_needed() {
             Self::init_with_recovery(config, &wal)
@@ -63,7 +61,7 @@ impl LSM {
         lsm
     }
 
-    fn init_clean(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
+    fn init_clean(config: Configuration, wal: &wal::WalManager) -> Result<LSM> {
         let memtable = Memtable::new();
 
         log::info!(target: "LSM", "starting lsm with fresh commit log",);
@@ -75,7 +73,7 @@ impl LSM {
         })
     }
 
-    fn init_with_recovery(config: Configuration, wal: &wal::Wal) -> Result<LSM> {
+    fn init_with_recovery(config: Configuration, wal: &wal::WalManager) -> Result<LSM> {
         log::info!(target: "LSM", "starting recovery from WAL");
 
         let memtable = Memtable::new();
@@ -94,7 +92,7 @@ impl LSM {
         })
     }
 
-    fn recover(lsm: &mut LSM, wal: &wal::Wal) -> Result<()> {
+    fn recover(lsm: &mut LSM, wal: &wal::WalManager) -> Result<()> {
         let reader = wal.open()?;
 
         for result_of_op in reader {

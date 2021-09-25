@@ -1,55 +1,75 @@
-//! Simple append only write ahead log
-//!
-//! This module provides the funcitonality for a simple append only wal.
-//! Every write is first written to this log before any further action is taken.
-//! In case of a crash the wal can be used to reconstruct the state prior to the
-//! crash.
-//! **Note** that the log writes to the filesystem without flushing, thus leaving
-//! the ultimate control over when the write happens to the OS at the benefit of a faster
-//! write through the FS cache.
+/// Simple append only write ahead log
+///
+/// This module provides the funcitonality for a simple append only wal.
+/// Every write is first written to this log before any further action is taken.
+/// In case of a crash the wal can be used to reconstruct the state prior to the
+/// crash.
+/// **Note** that the log writes to the filesystem without flushing, thus leaving
+/// the ultimate control over when the write happens to the OS at the benefit of a faster
+/// write through the FS cache.
+pub mod reader;
+pub mod serialization;
+pub mod writer;
 extern crate crc;
-
 use super::binary_io as binio;
-use crate::engine::{Key, Value};
-use log::trace;
-use serde;
-use serde::{Deserialize, Serialize};
+use crate::engine::storage::lsm::wal::reader::WalReader;
+use serde::{self, Deserialize, Serialize};
 use std::convert::From;
-use std::fs;
-use std::io;
-use std::io::{BufReader, BufWriter, Write};
 use std::path;
-use std::sync::{Arc, Mutex};
 use thiserror::Error;
+use writer::WalWriter;
 
-const VERSION: u8 = 1;
-const STANZA: &str = "r2d2::wal";
-const WAL_FILE_NAME: &str = "write_ahead.log";
+const WAL_FILE_NAME: &str = "wal.log";
 
 type Result<T> = std::result::Result<T, Error>;
 
-/// Initialize the WAL directory
-///
-/// The `init` function creates the required file structures to
-/// allow the WAL to work properly.
-///
-/// It is safe to call this method multiple times.
-pub fn init(storage_path: &path::Path) -> Result<Wal> {
-    let wal_path = storage_path.join("wal");
-    let wal_file_name = wal_path.join(WAL_FILE_NAME);
-    std::fs::create_dir_all(&wal_path)?;
+#[derive(Error, Debug)]
+pub enum Error {
+    #[error("IoError: {0}")]
+    IoError(#[from] std::io::Error),
+    #[error(transparent)]
+    BinIoError(#[from] binio::Error),
+    #[error("LockError")]
+    LockError,
+}
 
-    Ok(Wal {
-        active_file: wal_file_name,
-    })
+impl<T> From<std::sync::PoisonError<T>> for Error {
+    fn from(_: std::sync::PoisonError<T>) -> Self {
+        Error::LockError
+    }
+}
+
+#[derive(Serialize, Deserialize, PartialEq, Debug)]
+/// The operation to persist with the WAL
+pub enum Operation<K, V> {
+    /// Use this to commit a set operation for the provided key-value pair
+    Set(K, V),
+    /// Use this to commit the deletion of the provided key
+    Delete(K),
 }
 
 /// Representation of the Write Ahead Log
-pub struct Wal {
+pub struct WalManager {
     active_file: path::PathBuf,
 }
 
-impl Wal {
+impl WalManager {
+    /// Initialize the WAL directory
+    ///
+    /// The `init` function creates the required file structures to
+    /// allow the WAL to work properly.
+    ///
+    /// It is safe to call this method multiple times.
+    pub fn init(storage_path: &path::Path) -> Result<WalManager> {
+        let wal_path = storage_path.join("wal");
+        let wal_file_name = wal_path.join(WAL_FILE_NAME);
+        std::fs::create_dir_all(&wal_path)?;
+
+        Ok(WalManager {
+            active_file: wal_file_name,
+        })
+    }
+
     /// Uses the state in WAL directory to determine if a recovery is needed
     pub fn recovery_needed(&self) -> bool {
         self.active_file.exists()
@@ -82,150 +102,6 @@ impl Wal {
     /// This can be used to disabled WAL temporarily.
     pub fn null(&self) -> Result<WalWriter> {
         WalWriter::null()
-    }
-}
-
-#[derive(Error, Debug)]
-pub enum Error {
-    #[error("IoError: {0}")]
-    IoError(#[from] std::io::Error),
-    #[error(transparent)]
-    BinIoError(#[from] binio::Error),
-    #[error("LockError")]
-    LockError,
-}
-
-impl<T> From<std::sync::PoisonError<T>> for Error {
-    fn from(_: std::sync::PoisonError<T>) -> Self {
-        Error::LockError
-    }
-}
-
-#[derive(Deserialize, Serialize, PartialEq)]
-struct FileHeader {
-    stanza: Vec<u8>,
-    version: u8,
-}
-
-impl FileHeader {
-    fn new(stanza: &str, version: u8) -> FileHeader {
-        FileHeader {
-            stanza: stanza.as_bytes().to_vec(),
-            version,
-        }
-    }
-}
-
-#[derive(Serialize, Deserialize, PartialEq, Debug)]
-/// The operation to persist with the WAL
-pub enum Operation<K, V> {
-    /// Use this to commit a set operation for the provided key-value pair
-    Set(K, V),
-    /// Use this to commit the deletion of the provided key
-    Delete(K),
-}
-
-/// The WalWriter is the main interface you will interact with.
-///
-/// It provides the required functionality to write to the underlying WAL storage
-/// in a *thread-safe* manner.
-///
-/// All writes are automatically synchronized so it is fine to have multiple writers.
-/// However most of the time you actually want only a single writing thread.
-pub struct WalWriter {
-    file: Arc<Mutex<io::BufWriter<fs::File>>>,
-}
-
-impl WalWriter {
-    pub fn resume(path: &path::Path) -> Result<WalWriter> {
-        let writer = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .write(true)
-            .open(path)?;
-
-        Ok(WalWriter {
-            file: Arc::new(Mutex::new(BufWriter::new(writer))),
-        })
-    }
-
-    pub fn null() -> Result<WalWriter> {
-        let writer = fs::OpenOptions::new()
-            .append(true)
-            .write(true)
-            .open(path::Path::new("/dev/null"))?;
-
-        Ok(WalWriter {
-            file: Arc::new(Mutex::new(BufWriter::new(writer))),
-        })
-    }
-
-    pub fn create(path: &path::Path) -> Result<WalWriter> {
-        let mut writer = fs::OpenOptions::new().create(true).write(true).open(path)?;
-        let header = FileHeader::new(STANZA, VERSION);
-
-        binio::write_data(&mut writer, header)?;
-
-        Ok(WalWriter {
-            file: Arc::new(Mutex::new(BufWriter::new(writer))),
-        })
-    }
-
-    pub fn write(&mut self, op: Operation<&Key, &Value>) -> Result<usize> {
-        let mut file = self.file.lock()?;
-        let size = binio::write_data(&mut *file, op)?;
-        file.flush()?;
-
-        Ok(size)
-    }
-}
-
-/// A WalReader that gives access to committed operations in a convenient manner.
-///
-/// Use the reader to replay committed operations. It provides an iterator
-/// to the underlying `Operation`, which is assumed to be enough to
-/// restore state from the WAL.
-pub struct WalReader {
-    header: FileHeader,
-    file: io::BufReader<fs::File>,
-}
-
-impl WalReader {
-    pub fn open(path: &path::Path) -> Result<WalReader> {
-        let mut reader = fs::OpenOptions::new().read(true).open(path)?;
-        let header: FileHeader = binio::read_data_owned(&mut reader)?;
-
-        trace!("wal successfully opened. version = {}", header.version);
-
-        Ok(WalReader {
-            header,
-            file: BufReader::new(reader),
-        })
-    }
-
-    /// Reads the next commited operation from the WAL
-    ///
-    /// Use this to implement you own logic if you can't use the provided Iterator
-    /// implementation.
-    pub fn read(&mut self) -> Result<Operation<Key, Value>> {
-        let data = binio::read_data_owned(&mut self.file)?;
-        Ok(data)
-    }
-}
-
-impl Iterator for WalReader {
-    type Item = Result<Operation<Key, Value>>;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        match self.read() {
-            Err(Error::BinIoError(binio::Error::IoError(io_error)))
-                if io_error.kind() == io::ErrorKind::UnexpectedEof =>
-            {
-                None
-            }
-            Err(e) => Some(Err(e)),
-            ok => Some(ok),
-        }
     }
 }
 

@@ -7,7 +7,7 @@ fn main() -> Result<()> {
     let mut config_builder = engine::configuration::Builder::default();
     config_builder.storage.with_storage_path("/tmp")?;
 
-    let mut engine = engine::Engine::new(config_builder.build()?)?;
+    let mut engine = engine::Engine::start(config_builder.build()?)?;
     engine.set("Foo", "this is the value I want to store")?;
     engine.set("Bar", "some other value")?;
 

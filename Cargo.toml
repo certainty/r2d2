@@ -21,6 +21,7 @@ ubyte = "0.10"
 # cli
 clap = "3.0.0-beta.2"
 termion = "1.5.6"
+config = "0.11.0"
 
 # repl
 rustyline = "8.0.0"
