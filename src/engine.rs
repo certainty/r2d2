@@ -86,7 +86,7 @@ impl Engine {
     /// Find a value for the given key if it exists.
     /// This operation might fail, e.g. when implementatons need to access the
     /// filesystem or the network.
-    pub fn get(&self, key: &Key) -> Result<Option<&Value>> {
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
         log::trace!(target: "engine", "Lookup {:?}", key);
         Ok(self.lsm.get(&key)?)
     }

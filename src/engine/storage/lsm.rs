@@ -1,3 +1,4 @@
+use crate::engine::storage::lsm::sstable::Slab;
 use crate::engine::storage::lsm::wal::writer::WalWriter;
 /// The LSM implements a log structured merge tree using SSTables as C1
 ///
@@ -24,6 +25,8 @@ type Result<T> = std::result::Result<T, Error>;
 #[derive(Error, Debug)]
 pub enum Error {
     #[error(transparent)]
+    SSTableError(#[from] sstable::Error),
+    #[error(transparent)]
     WalError(#[from] wal::Error),
     #[error("IoError: {0}")]
     IoError(#[from] std::io::Error),
@@ -38,6 +41,7 @@ pub struct LSM {
     config: Configuration,
     wal: WalWriter,
     memtable: Memtable,
+    slabs: Vec<Slab>,
 }
 
 /// The memtable is the fast C0 system in the LSM.
@@ -70,6 +74,7 @@ impl LSM {
             config,
             wal: wal.create()?,
             memtable,
+            slabs: Vec::new(),
         })
     }
 
@@ -81,6 +86,7 @@ impl LSM {
             config,
             wal: wal.null()?,
             memtable,
+            slabs: Vec::new(),
         };
 
         Self::recover(&mut lsm_for_repair, &wal)?;
@@ -121,11 +127,24 @@ impl LSM {
         Ok(self.memtable.remove(k))
     }
 
-    pub fn get(&self, k: &Key) -> Result<Option<&Value>> {
-        Ok(self.memtable.get(k))
+    pub fn get(&self, k: &Key) -> Result<Option<Value>> {
+        Ok(self.get_c0(k).or(self.get_c1(k)?))
     }
 
     pub fn iter(&self) -> EngineIterator {
         EngineIterator::new(self.memtable.iter())
+    }
+
+    fn get_c0(&self, k: &Key) -> Option<Value> {
+        self.memtable.get(k).cloned()
+    }
+
+    fn get_c1(&self, k: &Key) -> Result<Option<Value>> {
+        let idx = self.slabs.binary_search_by(|f| f.cmp(&k));
+
+        match idx {
+            Ok(idx) => Ok(self.slabs[idx].sstable()?.get(&k)?),
+            Err(_) => Ok(None),
+        }
     }
 }

@@ -14,7 +14,7 @@ fn check_lsm_works() -> anyhow::Result<()> {
 
     assert!(lsm.get(&foo)?.is_none());
     assert!(lsm.set(foo.clone(), bar.clone()).is_ok());
-    assert_eq!(Some(&bar.clone()), lsm.get(&foo)?);
+    assert_eq!(Some(bar.clone()), lsm.get(&foo)?);
 
     Ok(())
 }
@@ -40,7 +40,7 @@ fn check_recovery_from_commit_log() -> anyhow::Result<()> {
     let lsm = lsm::LSM::new(config)?;
 
     // keys should be there now
-    assert_eq!(Some(&baz.clone()), lsm.get(&foo)?);
-    assert_eq!(Some(&baz.clone()), lsm.get(&bar)?);
+    assert_eq!(Some(baz.clone()), lsm.get(&foo)?);
+    assert_eq!(Some(baz.clone()), lsm.get(&bar)?);
     Ok(())
 }
