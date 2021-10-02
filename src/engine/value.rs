@@ -5,6 +5,7 @@ use std::string::FromUtf8Error;
 
 #[derive(Debug, Clone, Hash, PartialEq, Serialize, Deserialize)]
 #[repr(transparent)]
+/// A value is an arbitrary sequence of bytes
 pub struct Value(Vec<u8>);
 
 impl Value {

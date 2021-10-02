@@ -1,10 +1,6 @@
-mod utils;
-
 use r2d2::engine::storage::lsm::sstable;
 use r2d2::engine::{Key, Value};
-use std::path::Path;
 use tempfile::tempdir;
-use utils::*;
 
 #[test]
 fn check_write_sstable() {

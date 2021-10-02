@@ -1,5 +1,4 @@
-/// The engine is the main abstraction that you use
-/// to interact with the key-value store system.
+/// The engine is the main abstraction to interact with the key-value store system.
 ///
 /// The engine owns all key-value pairs and takes care of
 /// interacting with them, delegating storage to its subsystem.
@@ -7,41 +6,49 @@
 /// It maintains the local state as well as providing
 /// the necessary data transfer to update the cluster state if required.
 ///
-/// It presents itself with a dictionary-like interfacer where each operation
+/// It presents itself with a dictionary-like interface where each operation
 /// might fail. This is deliberate since every operation has to potentially interact
 /// with the OS or the network which are unreliable components.
+// re-exports for convenience
+pub use key::Key;
+use log;
+use std::fmt::Debug;
 use thiserror::Error;
+pub use value::Value;
+
+use crate::engine::configuration::Configuration;
 
 pub mod configuration;
 pub mod directories;
 pub mod key;
 pub mod storage;
 pub mod value;
-use log::*;
 
-// re-exports for convenience
-use crate::engine::configuration::Configuration;
-pub use key::Key;
-use std::fmt::Debug;
-pub use value::Value;
+pub type Result<T> = std::result::Result<T, Error>;
 
 #[derive(Error, Debug)]
 pub enum Error {
+    #[error(transparent)]
+    ConfigurationError(#[from] configuration::Error),
+    #[error(transparent)]
+    StorageConfigurationError(#[from] storage::lsm::configuration::Error),
+
     #[error(transparent)]
     StorageError(#[from] storage::lsm::Error),
     #[error(transparent)]
     FileSystemError(#[from] directories::Error),
 }
 
-pub type Result<T> = std::result::Result<T, Error>;
-
+/// The engine encapsulates local storage, replication and distribution
 pub struct Engine {
     lsm: storage::lsm::LSM,
 }
 
 impl Engine {
-    pub fn new(config: Configuration) -> Result<Self> {
+    /// Starts up the engine and makes sure it's operational.
+    pub fn start(config: Configuration) -> Result<Self> {
         directories::setup_directories(&config)?;
+
         let lsm = storage::lsm::LSM::new(config.storage)?;
         Ok(Self { lsm })
     }
@@ -56,7 +63,7 @@ impl Engine {
         key: K,
         value: V,
     ) -> Result<Option<Value>> {
-        trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
+        log::trace!(target: "engine", "Insert {:?} -> {:?}", key, value);
         Ok(self.lsm.set(key.into(), value.into())?)
     }
 
@@ -70,7 +77,7 @@ impl Engine {
     /// * the change is durable on the local node.
     /// * the key/value can not be found anymore (unless it has been re-inserted)
     pub fn del(&mut self, key: &Key) -> Result<Option<Value>> {
-        trace!(target: "engine", "Delete {:?}", key);
+        log::trace!(target: "engine", "Delete {:?}", key);
         Ok(self.lsm.del(&key)?)
     }
 
@@ -79,8 +86,8 @@ impl Engine {
     /// Find a value for the given key if it exists.
     /// This operation might fail, e.g. when implementatons need to access the
     /// filesystem or the network.
-    pub fn get(&self, key: &Key) -> Result<Option<&Value>> {
-        trace!(target: "engine", "Lookup {:?}", key);
+    pub fn get(&self, key: &Key) -> Result<Option<Value>> {
+        log::trace!(target: "engine", "Lookup {:?}", key);
         Ok(self.lsm.get(&key)?)
     }
 

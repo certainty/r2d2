@@ -1,5 +1,5 @@
 use crate::client::repl;
-use crate::engine;
+use crate::engine::{configuration, directories, Engine};
 use clap::Clap;
 use std::path::PathBuf;
 
@@ -11,14 +11,24 @@ pub struct Opts {
 }
 
 pub fn execute(opts: &Opts) -> anyhow::Result<()> {
-    let storage_config = if let Some(dir) = &opts.storage_directory {
-        engine::storage::Configuration::new(PathBuf::from(dir))
-    } else {
-        engine::storage::Configuration::new(engine::directories::default_storage_path()?)
-    };
-    let config = engine::configuration::Configuration::new(storage_config);
-
-    let mut engine = engine::Engine::new(config)?;
+    let config = configure(opts)?;
+    let mut engine = Engine::start(config)?;
     repl::run(&mut engine);
     Ok(())
+}
+
+fn configure(opts: &Opts) -> anyhow::Result<configuration::Configuration> {
+    let mut configuration_builder = configuration::Builder::default();
+
+    let storage_base_path = match &opts.storage_directory {
+        Some(path) => PathBuf::from(path),
+        _ => directories::default_storage_path()?,
+    };
+
+    configuration_builder
+        .storage
+        .with_storage_path(storage_base_path)?;
+    let config = configuration_builder.build()?;
+
+    Ok(config)
 }

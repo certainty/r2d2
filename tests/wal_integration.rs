@@ -1,16 +1,12 @@
-mod utils;
-
 use r2d2::engine::storage::lsm::wal;
 use r2d2::engine::{Key, Value};
-use std::path::Path;
 use tempfile::tempdir;
-use utils::*;
 use wal::Operation;
 
 #[test]
 fn check_wal_works() {
     let test_storage_dir = tempdir().unwrap();
-    let wal = wal::init(&test_storage_dir.path().to_path_buf()).unwrap();
+    let wal = wal::WalManager::init(&test_storage_dir.path().to_path_buf()).unwrap();
     let mut log_writer = wal.create().unwrap();
     let mut log_reader = wal.open().unwrap();
     let foo = Key::from("foo");
@@ -34,7 +30,7 @@ fn check_wal_works() {
 #[test]
 fn check_wal_iterator() {
     let test_storage_dir = tempdir().unwrap();
-    let wal = wal::init(&test_storage_dir.path().to_path_buf()).unwrap();
+    let wal = wal::WalManager::init(&test_storage_dir.path().to_path_buf()).unwrap();
     let mut log_writer = wal.create().unwrap();
     let foo = Key::from("foo");
     let baz = Value::from("baz");
@@ -60,7 +56,7 @@ fn check_wal_iterator() {
 #[test]
 fn check_iterator_empty_file() {
     let test_storage_dir = tempdir().unwrap();
-    let wal = wal::init(&test_storage_dir.path().to_path_buf()).unwrap();
+    let wal = wal::WalManager::init(&test_storage_dir.path().to_path_buf()).unwrap();
     let _log_writer = wal.create().unwrap();
     let mut log_reader = wal.open().unwrap();
 
@@ -70,7 +66,7 @@ fn check_iterator_empty_file() {
 #[test]
 fn check_log_resume() {
     let test_storage_dir = tempdir().unwrap();
-    let wal = wal::init(&test_storage_dir.path().to_path_buf()).unwrap();
+    let wal = wal::WalManager::init(&test_storage_dir.path().to_path_buf()).unwrap();
     let foo = Key::from("foo");
     let foobar = Key::from("foobar");
     let bar = Value::from("bar");

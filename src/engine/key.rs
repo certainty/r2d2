@@ -5,6 +5,7 @@ use std::string::FromUtf8Error;
 
 #[repr(transparent)]
 #[derive(Debug, Clone, Ord, Hash, PartialOrd, PartialEq, Serialize, Deserialize)]
+/// A key is an arbitrary sequence of bytes
 pub struct Key(Vec<u8>);
 
 impl Eq for Key {}

@@ -14,6 +14,7 @@ use super::binary_io as binio;
 use crate::engine::{Key, Value};
 use log::{info, trace};
 use serde::{Deserialize, Serialize};
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fs;
 use std::fs::OpenOptions;
@@ -42,11 +43,11 @@ pub enum Error {
 
 /// A Slab is meta information about an existing SSTable
 ///
-/// In the LSM the engine holds a list of know slabs and uses
+/// In the LSM the engine holds a list of known slabs and uses
 /// those to find the SSTable that might contain the key that
-/// it's looking for. If the slab covers the key it gives accesss
-/// to the associated SSTable which can then be use to do the lookup.
-#[derive(Debug)]
+/// it's looking for. If the slab covers the key it gives access
+/// to the associated SSTable which can then be used to do the lookup.
+#[derive(Debug, PartialEq)]
 pub struct Slab {
     /// The level of the slab and its associated SSTable
     pub level: Level,
@@ -58,6 +59,12 @@ pub struct Slab {
     path: path::PathBuf,
 }
 
+impl PartialOrd for Slab {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        self.max_key.partial_cmp(&other.min_key)
+    }
+}
+
 impl Slab {
     pub fn new(level: Level, path: &path::Path, min_key: Key, max_key: Key) -> Slab {
         Slab {
@@ -65,6 +72,19 @@ impl Slab {
             path: path.to_owned(),
             min_key,
             max_key,
+        }
+    }
+
+    /// Compare the slab with the key
+    /// Returns an ordering that specifies if the key is smaller,
+    /// greater or equal to the slab's range
+    pub fn cmp(&self, k: &Key) -> Ordering {
+        if &self.max_key < k {
+            Ordering::Less
+        } else if &self.min_key > k {
+            Ordering::Greater
+        } else {
+            Ordering::Equal
         }
     }
 
@@ -88,7 +108,6 @@ impl Slab {
 ///
 /// You can open an SSTable by calling the `sstable()` method of a `Slab`.
 pub struct SSTable {
-    // TODO: a trie could be a better choice memory-wise?
     index: HashMap<Key, Offset>,
     path: path::PathBuf,
     reader: Reader,
