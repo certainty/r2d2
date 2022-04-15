@@ -21,3 +21,20 @@ make repl
 ```
 make test
 ```
+
+## Todo
+
+### LSM
+
+- [ ] Use sstables correctly (currently I believe I don't always find the right one)
+- [ ] Implement proper handling of tombstones in sstables
+- [ ] Use a (concurrent) skiplist for the memtable and different write threads 
+
+### Distribution
+- [ ] Add grpc based communication
+- [ ] Add vnodes and consistent hashing to identify the correct node
+- [ ] Add gossping to distribute state
+
+
+### Repl
+- [ ] Add text UI to display cluster properties and interact with the server
