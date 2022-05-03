@@ -27,7 +27,7 @@ defmodule Store.MixProject do
   # Run "mix help deps" to learn about dependencies.
   defp deps do
     [
-      {:bert, "~> 0.1.0"},
+      {:bertex, "~> 1.3"},
       {:eternal, "~> 1.2"}
     ]
   end

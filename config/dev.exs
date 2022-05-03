@@ -2,5 +2,5 @@ import Config
 
 config :store,
   storage: %{
-    base_path: nil
+    base_path: "/tmp/r2d2"
   }
