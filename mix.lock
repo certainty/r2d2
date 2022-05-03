@@ -1,4 +1,5 @@
 %{
   "bert": {:hex, :bert, "0.1.0", "a87d6693515070a9b287c1043cb7e5b2406be0357685022764bfbd2609703555", [:rebar3], [], "hexpm", "2a561521ec3529b248658a3e2d3d4bfe6729b0ab8291c701bf15ef413eda1506"},
   "erlang_skiplist": {:hex, :erlang_skiplist, "0.3.0", "9444f93128b4f43281823f6e73ecdfec054740b93b9036836ddc9d1a696558a5", [:rebar3], [], "hexpm", "54755d36ec7d6fd9b3f2917bbcb6ce068bc9ee343aecd46df87c64c551d50f5d"},
+  "eternal": {:hex, :eternal, "1.2.2", "d1641c86368de99375b98d183042dd6c2b234262b8d08dfd72b9eeaafc2a1abd", [:mix], [], "hexpm", "2c9fe32b9c3726703ba5e1d43a1d255a4f3f2d8f8f9bc19f094c7cb1a7a9e782"},
 }

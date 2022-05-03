@@ -8,7 +8,7 @@ defmodule Node.Supervisor do
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(init_arg) do
-    Logger.info("Node::Supervisor starting")
+    Logger.info("#{__MODULE__} starting")
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
 

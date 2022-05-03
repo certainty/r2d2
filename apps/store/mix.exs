@@ -18,7 +18,7 @@ defmodule Store.MixProject do
   # Run "mix help compile.app" to learn about applications.
   def application do
     [
-      extra_applications: [:logger],
+      extra_applications: [:logger, :eternal],
       env: [node: %{:listen => "127.0.0.1:4000"}, storage: %{}],
       mod: {Store, []}
     ]
@@ -28,7 +28,7 @@ defmodule Store.MixProject do
   defp deps do
     [
       {:bert, "~> 0.1.0"},
-      {:erlang_skiplist, "~> 0.3.0"}
+      {:eternal, "~> 1.2"}
     ]
   end
 end

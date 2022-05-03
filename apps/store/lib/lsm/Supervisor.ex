@@ -8,15 +8,15 @@ defmodule Lsm.Supervisor do
 
   @spec start_link(any) :: :ignore | {:error, any} | {:ok, pid}
   def start_link(init_arg) do
-    Logger.info("Starting LSM supervisor")
+    Logger.info("#{__MODULE__} starting")
     Supervisor.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
 
   def init(storage_options) do
     children = [
+      {Lsm.Wal, storage_options},
       {Lsm.C0, []},
-      {Lsm.C1, storage_options},
-      {Lsm.Wal, storage_options}
+      {Lsm.C1.Supervisor, storage_options}
     ]
 
     Supervisor.init(children, strategy: :one_for_one)

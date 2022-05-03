@@ -7,7 +7,7 @@ defmodule Lsm.Wal do
   use GenServer
 
   def start_link(init_arg) do
-    Logger.info("LSM::WAL starting")
+    Logger.info("#{__MODULE__} starting")
     GenServer.start_link(__MODULE__, init_arg, name: __MODULE__)
   end
 

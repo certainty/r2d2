@@ -7,7 +7,7 @@ defmodule Store do
   use Application
 
   def start(_type, _args) do
-    Logger.info("Starting r2d2 store")
+    Logger.info("#{__MODULE__} starting")
 
     {:ok, lsm_opts} = lsm_options()
 
