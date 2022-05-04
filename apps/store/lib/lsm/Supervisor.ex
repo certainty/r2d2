@@ -14,7 +14,6 @@ defmodule Lsm.Supervisor do
 
   def init(storage_options) do
     children = [
-      {Lsm.Wal, storage_options},
       {Lsm.C0, []},
       {Lsm.C1.Supervisor, storage_options}
     ]
