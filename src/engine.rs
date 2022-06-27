@@ -18,6 +18,8 @@ pub use value::Value;
 
 use crate::engine::configuration::Configuration;
 
+use self::storage::lsm::memtable;
+
 pub mod configuration;
 pub mod directories;
 pub mod key;
@@ -107,7 +109,7 @@ impl<'a> EngineIterator<'a> {
 }
 
 impl<'a> Iterator for EngineIterator<'a> {
-    type Item = (&'a Key, &'a Value);
+    type Item = (&'a Key, &'a memtable::Entry);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter.next()
