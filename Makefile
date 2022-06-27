@@ -24,10 +24,10 @@ install:
 	$(CARGO) install
 
 run:
-	$(CARGO) run repl
+	$(CARGO) run --bin repl
 
 test:
 	$(CARGO) test -- --nocapture
 
 repl:
-	$(CARGO) run client -- repl
+	$(CARGO) run --bin client -- repl

@@ -2,10 +2,10 @@ mod server;
 
 extern crate env_logger;
 extern crate log;
-use clap::{AppSettings, Clap};
+use clap::{AppSettings, Parser};
 use r2d2::client::cli::command::repl;
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 #[clap(setting = AppSettings::ColoredHelp)]
 struct Opts {
     #[clap(subcommand)]
@@ -14,12 +14,13 @@ struct Opts {
     #[clap(
         short,
         long,
-        about = "specify the path to the config file, if it is not to be found in the default location"
+        about,
+        help = "The configuration file to use, if it's not in the default location"
     )]
     config: Option<String>,
 }
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 enum SubCommand {
     #[clap(version = "0.1", author = "David K.")]
     Repl(repl::Opts),
