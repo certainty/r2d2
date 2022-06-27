@@ -1,5 +1,6 @@
 use crate::engine::storage::lsm::sstable::Slab;
 use crate::engine::storage::lsm::wal::writer::WalWriter;
+
 /// The LSM implements a log structured merge tree using SSTables as C1
 ///
 /// Docs: https://en.wikipedia.org/wiki/Log-structured_merge-tree/
@@ -12,13 +13,15 @@ use crate::engine::storage::lsm::wal::writer::WalWriter;
 use crate::engine::{EngineIterator, Key, Value};
 use configuration::Configuration;
 use log;
-use std::collections::BTreeMap;
 use thiserror::Error;
 
 pub mod binary_io;
 pub mod configuration;
+pub mod memtable;
 pub mod sstable;
 pub mod wal;
+
+use memtable::{BTreeMemtable, Memtable};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -40,19 +43,12 @@ pub enum Error {
 pub struct LSM {
     config: Configuration,
     wal: WalWriter,
-    memtable: Memtable,
+    memtable: BTreeMemtable,
     slabs: Vec<Slab>,
 }
 
-/// The memtable is the fast C0 system in the LSM.
-/// It has two main properties:
-/// 1. fast key based operations (lookup and insertion)
-/// 2. sorted iteration over keys (to dump to SSTables)
-type Memtable = BTreeMap<Key, Value>;
-pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Value>;
-
 impl LSM {
-    pub fn new(config: Configuration) -> Result<LSM> {
+    pub fn new(config: Configuration) -> Result<Self> {
         let wal = wal::WalManager::init(&config.storage_path)?;
 
         let lsm = if wal.recovery_needed() {
@@ -65,8 +61,8 @@ impl LSM {
         lsm
     }
 
-    fn init_clean(config: Configuration, wal: &wal::WalManager) -> Result<LSM> {
-        let memtable = Memtable::new();
+    fn init_clean(config: Configuration, wal: &wal::WalManager) -> Result<Self> {
+        let memtable = BTreeMemtable::new();
 
         log::info!(target: "LSM", "starting lsm with fresh commit log",);
 
@@ -78,10 +74,10 @@ impl LSM {
         })
     }
 
-    fn init_with_recovery(config: Configuration, wal: &wal::WalManager) -> Result<LSM> {
+    fn init_with_recovery(config: Configuration, wal: &wal::WalManager) -> Result<Self> {
         log::info!(target: "LSM", "starting recovery from WAL");
 
-        let memtable = Memtable::new();
+        let memtable = BTreeMemtable::new();
         let mut lsm_for_repair = LSM {
             config,
             wal: wal.null()?,
@@ -98,7 +94,7 @@ impl LSM {
         })
     }
 
-    fn recover(lsm: &mut LSM, wal: &wal::WalManager) -> Result<()> {
+    fn recover(lsm: &mut Self, wal: &wal::WalManager) -> Result<()> {
         let reader = wal.open()?;
 
         for result_of_op in reader {
