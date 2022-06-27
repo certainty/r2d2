@@ -1,12 +1,12 @@
 use crate::client::repl;
 use crate::engine::{configuration, directories, Engine};
-use clap::Clap;
+use clap::Parser;
 use std::path::PathBuf;
 
-#[derive(Clap)]
+#[derive(Parser, Debug)]
 #[clap(version = "0.1", author = "David K.", about = "Start the REPL")]
 pub struct Opts {
-    #[clap(short, long, about = "the path to the directory for the storage")]
+    #[clap(short, long, about, help = "The storage directory to use")]
     storage_directory: Option<String>,
 }
 
