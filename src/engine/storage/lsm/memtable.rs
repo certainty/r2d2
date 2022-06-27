@@ -12,52 +12,34 @@ pub enum Entry {
     Val(Value),
 }
 
-pub trait Memtable {
-    // places a tombstone for `key` and returns the value it had before removal
-    fn remove(&mut self, key: &Key) -> Option<Entry>;
-
-    // insert the `value` for the given `key` and return the previous associated value with `key` if there was one.
-    fn insert(&mut self, key: Key, value: Value) -> Option<Entry>;
-
-    fn get(&self, key: &Key) -> Option<&Value>;
-
-    // clear the table make sure it's empty
-    fn clear(&mut self);
-
-    // return an iterator for all elements in the memtable
-    fn iter<'a>(&self) -> dyn Iterator<Item = (&'a Key, &'a Entry)>;
-}
-
-#[repr(transparent)]
 pub struct BTreeMemtable(BTreeMap<Key, Entry>);
+pub type Iter<'a> = std::collections::btree_map::Iter<'a, Key, Entry>;
 
 impl BTreeMemtable {
     pub fn new() -> Self {
         BTreeMemtable(BTreeMap::new())
     }
-}
 
-impl Memtable for BTreeMemtable {
-    fn remove(&mut self, key: &Key) -> Option<Entry> {
+    pub fn remove(&mut self, key: &Key) -> Option<Entry> {
         self.0.remove(key)
     }
 
-    fn insert(&mut self, key: Key, value: Value) -> Option<Entry> {
+    pub fn insert(&mut self, key: Key, value: Value) -> Option<Entry> {
         self.0.insert(key, Entry::Val(value))
     }
 
-    fn get(&self, key: &Key) -> Option<&Value> {
+    pub fn get(&self, key: &Key) -> Option<&Value> {
         match self.0.get(key) {
             Some(Entry::Val(value)) => Some(value),
             _ => None,
         }
     }
 
-    fn clear(&mut self) {
+    pub fn clear(&mut self) {
         self.0.clear()
     }
 
-    fn iter<'a>(&self) -> dyn Iterator<Item = (&'a Key, &'a Entry)> {
+    pub fn iter(&self) -> Iter {
         self.0.iter()
     }
 }

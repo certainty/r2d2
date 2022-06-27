@@ -26,8 +26,11 @@ make test
 
 ### LSM
 
+
 - [ ] Use sstables correctly (currently I believe I don't always find the right one)
 - [ ] Implement proper handling of tombstones in sstables
+- [ ] Use bloomfilter in sstables 
+- [ ] Use LRU cache before accessing on disk data for sstables
 - [ ] Use a (concurrent) skiplist for the memtable and different write threads 
 
 ### Distribution

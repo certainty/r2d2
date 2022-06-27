@@ -21,7 +21,9 @@ pub mod memtable;
 pub mod sstable;
 pub mod wal;
 
-use memtable::{BTreeMemtable, Memtable};
+use memtable::BTreeMemtable;
+
+use self::memtable::Entry;
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -46,6 +48,8 @@ pub struct LSM {
     memtable: BTreeMemtable,
     slabs: Vec<Slab>,
 }
+
+pub type Iter<'a> = memtable::Iter<'a>;
 
 impl LSM {
     pub fn new(config: Configuration) -> Result<Self> {
@@ -115,12 +119,18 @@ impl LSM {
 
     pub fn set(&mut self, k: Key, v: Value) -> Result<Option<Value>> {
         self.wal.write(wal::Operation::Set(&k, &v))?;
-        Ok(self.memtable.insert(k, v))
+        Ok(self.memtable.insert(k, v).and_then(|value| match value {
+            Entry::Val(v) => Some(v),
+            _ => None,
+        }))
     }
 
     pub fn del(&mut self, k: &Key) -> Result<Option<Value>> {
         self.wal.write(wal::Operation::Delete(k))?;
-        Ok(self.memtable.remove(k))
+        Ok(self.memtable.remove(k).and_then(|value| match value {
+            Entry::Val(v) => Some(v),
+            _ => None,
+        }))
     }
 
     pub fn get(&self, k: &Key) -> Result<Option<Value>> {
